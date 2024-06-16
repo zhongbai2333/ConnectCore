@@ -1,5 +1,4 @@
-import json
-import os
+import json, os, sys, zipfile
 import yaml
 
 
@@ -36,8 +35,12 @@ class YmlLanguage:
 
     # 读取yaml
     def _read_yaml(self, lang="en_us"):
-        # 打开文件： yaml文件路径、r读取、编码、 重命名为文件流
-        with open(f"./lang/{lang}.yml", "r", encoding="utf-8") as f:
-            # 加载文件： 文件流、加载方式
-            data = yaml.load(stream=f, Loader=yaml.FullLoader)
-            return data
+        if getattr(sys, 'frozen', False):
+            with zipfile.ZipFile(sys.argv[0], 'r') as pyz:
+                with pyz.open(f"./lang/{lang}.yml", "r", encoding="utf-8") as f:
+                    data = yaml.load(stream=f, Loader=yaml.FullLoader)
+                    return data
+        else:
+            with open(f"./lang/{lang}.yml", "r", encoding="utf-8") as f:
+                data = yaml.load(stream=f, Loader=yaml.FullLoader)
+                return data
