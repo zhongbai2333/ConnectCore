@@ -7,7 +7,14 @@
     "zh_cn": "将你的Minecraft Server连接到一起并控制。"
   },
   "author": "zhongbai233",
-  "link": "https://github.com/zhongbai2333/CloudBackup",
+  "link": "https://github.com/zhongbai2333/ConnetCore",
   "dependencies": {
-  }
+  },
+  "entrypoint": "prime_backup.mcdr.mcdr_entry",
+  "archive_name": "ConnectCore-v{version}.pyz",
+  "resources": [
+    "lang",
+    "__main__.py",
+    "LICENSE"
+  ]
 }

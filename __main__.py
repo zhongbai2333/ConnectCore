@@ -1,6 +1,6 @@
 def start_cli():
-    from cloud_backup.cli import start_main
-    start_main()
+    from connect_core.cli.cli_entry import main
+    main()
 
 if __name__ == "__main__":
     start_cli()

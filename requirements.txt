@@ -1,0 +1,4 @@
+mcdreforged>=2.12.0
+websockets>=12.0
+pyOpenSSL>=24.1.0
+pyyaml>=6.0.1

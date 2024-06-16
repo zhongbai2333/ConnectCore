@@ -1,0 +1,10 @@
+connect_core:
+  cli:
+    initialization_config:
+      enter_ip: "请输入服务器IP/域名(公网): [Localhost] "
+      enter_port: "请输入服务器端口: [23233] "
+      enter_password: "请输入群服务器密码: [{}] "
+      finish: "已将配置文件保存至config.json, 程序将在3秒后重启..."
+    starting:
+      welcome: "服务器将运行于 {}"
+      welcome_password: "群组密钥为 {}"
