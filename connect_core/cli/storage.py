@@ -3,7 +3,7 @@ import yaml
 
 
 class JsonDataEditor:
-    def __init__(self, filepath="./config.json"):
+    def __init__(self, filepath="config.json"):
         self.filepath = filepath
         # 检查文件是否存在，如果不存在则创建空的JSON文件
         if not os.path.exists(filepath):
@@ -37,10 +37,10 @@ class YmlLanguage:
     def _read_yaml(self, lang="en_us"):
         if zipfile.is_zipfile(sys.argv[0]):
             with zipfile.ZipFile(sys.argv[0], 'r') as pyz:
-                with pyz.open(f"./lang/{lang}.yml") as f:
-                    data = yaml.load(stream=f, Loader=yaml.FullLoader)
-                    return data
+                with pyz.open(f"lang/{lang}.yml") as f:
+                    config_data = f.read().decode("utf-8")
+                    return yaml.safe_load(config_data)
         else:
-            with open(f"./lang/{lang}.yml", "r", encoding="utf-8") as f:
+            with open(f"lang/{lang}.yml", "r", encoding="utf-8") as f:
                 data = yaml.load(stream=f, Loader=yaml.FullLoader)
                 return data

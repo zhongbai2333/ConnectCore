@@ -5,7 +5,7 @@ class LogSystem:
     def __init__(
         self,
         filelog: str = f"Log-{time.strftime('%b_%d-%H_%M_%S', time.localtime())}.log",
-        path: str = "./logs/",
+        path: str = "logs/",
     ):
         if not os.path.exists(path):
             os.makedirs(path)
