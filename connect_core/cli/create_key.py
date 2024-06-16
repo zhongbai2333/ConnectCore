@@ -2,7 +2,7 @@ import os
 from OpenSSL import crypto
 
 
-def create_ssl_key(ip: str, path="cert/"):
+def create_ssl_key(ip: str, path="certs/"):
     if not os.path.exists(path):
         os.makedirs(path)
     # 生成私钥

@@ -1,4 +1,4 @@
-import websockets, random, string, sys, os
+import random, string, sys, os, threading, ctypes
 
 from time import sleep
 from connect_core.cli.log_system import LogSystem
@@ -36,6 +36,8 @@ def restart_program():
 
 
 def start_server():
+    from connect_core.cli.create_key import create_ssl_key
+    from connect_core.https.flask_server import https_main
     info_print(
             translate["connect_core"]["cli"]["starting"]["welcome"].format(
                 f"{config['ip']}:{config['port']}"
@@ -46,6 +48,16 @@ def start_server():
                 config["password"]
             )
         )
+    create_ssl_key(config['ip'])
+    https_server = threading.Thread(target=https_main)
+    https_server.daemon = True
+    https_server.start()
+    try:
+        while True:
+            sleep(1)
+    except KeyboardInterrupt:
+        print()
+        sys.exit(0)
 
 
 def create_string_number(n) -> str:
@@ -66,7 +78,7 @@ def initialization_config() -> dict:
     ip = info_input(
         translate["connect_core"]["cli"]["initialization_config"]["enter_ip"]
     )
-    ip = ip if ip else "Localhost"
+    ip = ip if ip else "127.0.0.1"
     port = info_input(
         translate["connect_core"]["cli"]["initialization_config"]["enter_port"]
     )
