@@ -33,7 +33,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Cloud Backup distribution for ${{ github.sha }}
+        name: ConnectCore distribution for ${{ github.sha }}
         path: package/
 
     - name: Publish distribution to release
