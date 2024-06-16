@@ -10,7 +10,7 @@
   "link": "https://github.com/zhongbai2333/ConnetCore",
   "dependencies": {
   },
-  "entrypoint": "prime_backup.mcdr.mcdr_entry",
+  "entrypoint": "connect_core.mcdr.mcdr_entry",
   "archive_name": "ConnectCore-v{version}.pyz",
   "resources": [
     "lang",
