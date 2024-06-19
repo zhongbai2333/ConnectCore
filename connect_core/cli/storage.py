@@ -36,7 +36,7 @@ class YmlLanguage:
     # 读取yaml
     def _read_yaml(self, lang="en_us"):
         if zipfile.is_zipfile(sys.argv[0]):
-            with zipfile.ZipFile(sys.argv[0], 'r') as pyz:
+            with zipfile.ZipFile(sys.argv[0], "r") as pyz:
                 with pyz.open(f"lang/{lang}.yml") as f:
                     config_data = f.read().decode("utf-8")
                     return yaml.safe_load(config_data)

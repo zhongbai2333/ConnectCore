@@ -1,31 +1,25 @@
-import random, string, sys, os, threading, ctypes
+import random, string, sys, os, threading
 
 from time import sleep
-from connect_core.cli.log_system import LogSystem
+from connect_core.cli.log_system import info_input, info_print
+from connect_core.cli.get_config_translate import config, translate
 
-global translate, config
-global info_print, info_input
+global translate_temp
 
 
 def main():
     from connect_core.cli.storage import JsonDataEditor
 
-    global info_print, info_input
     config_edit = JsonDataEditor()
-    log_system = LogSystem()
-    info_print = log_system.info_print
-    info_input = log_system.info_input
     info_print("\nConnectCore Starting...")
+    # 判断是否是第一次启动
     if config_edit.read():
-        from connect_core.cli.storage import YmlLanguage
-
-        global translate, config
-        config = config_edit.read()
-        translate = YmlLanguage(config["language"]).translate
         start_server()
     else:
         config_edit.write(initialization_config())
-        info_print(translate["connect_core"]["cli"]["initialization_config"]["finish"])
+        info_print(
+            translate_temp["connect_core"]["cli"]["initialization_config"]["finish"]
+        )
         sleep(3)
         restart_program()
 
@@ -35,23 +29,26 @@ def restart_program():
     os.execl(python, python, *sys.argv)
 
 
+# 启动服务器
 def start_server():
     from connect_core.cli.create_key import create_ssl_key
-    from connect_core.https.flask_server import https_main
+    from connect_core.https.http_server import https_main
+
     info_print(
-            translate["connect_core"]["cli"]["starting"]["welcome"].format(
-                f"{config['ip']}:{config['port']}"
-            )
+        translate()["connect_core"]["cli"]["starting"]["welcome"].format(
+            f"{config()['ip']}:{config()['port']}"
         )
+    )
     info_print(
-            translate["connect_core"]["cli"]["starting"]["welcome_password"].format(
-                config["password"]
-            )
+        translate()["connect_core"]["cli"]["starting"]["welcome_password"].format(
+            config()["password"]
         )
-    create_ssl_key(config['ip'])
-    https_server = threading.Thread(target=https_main)
-    https_server.daemon = True
-    https_server.start()
+    )
+    create_ssl_key(config()["ip"])
+    # 创建 https服务器 线程
+    https_server_thread = threading.Thread(target=https_main)
+    https_server_thread.daemon = True
+    https_server_thread.start()
     try:
         while True:
             sleep(1)
@@ -60,6 +57,7 @@ def start_server():
         sys.exit(0)
 
 
+# 随机字符串 -> 生成密钥
 def create_string_number(n) -> str:
     m = random.randint(1, n)
     a = "".join([str(random.randint(0, 9)) for _ in range(m)])
@@ -67,27 +65,40 @@ def create_string_number(n) -> str:
     return "".join(random.sample(list(a + b), n))
 
 
+# 第一次启动配置
 def initialization_config() -> dict:
     from connect_core.cli.storage import YmlLanguage
 
     lang = info_input("Choose language | 请选择语言: [EN_US/zh_cn] ")
     lang = lang if lang else "en_us"
     lang.lower()
-    global translate
-    translate = YmlLanguage(lang).translate
+    global translate_temp
+    translate_temp = YmlLanguage(lang).translate
     ip = info_input(
-        translate["connect_core"]["cli"]["initialization_config"]["enter_ip"]
+        translate_temp["connect_core"]["cli"]["initialization_config"]["enter_ip"]
     )
     ip = ip if ip else "127.0.0.1"
     port = info_input(
-        translate["connect_core"]["cli"]["initialization_config"]["enter_port"]
+        translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
     )
     port = int(port) if port else 23233
+    https_port = info_input(
+        translate_temp["connect_core"]["cli"]["initialization_config"][
+            "enter_https_port"
+        ]
+    )
+    https_port = int(https_port) if https_port else 4443
     password_create = create_string_number(10)
     password = info_input(
-        translate["connect_core"]["cli"]["initialization_config"][
+        translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_password"
         ].format(password_create)
     )
     password = password if password else password_create
-    return {"language": lang, "ip": ip, "port": port, "password": password}
+    return {
+        "language": lang,
+        "ip": ip,
+        "port": port,
+        "https_port": https_port,
+        "password": password,
+    }

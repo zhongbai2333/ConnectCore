@@ -1,5 +1,7 @@
 import time, os
 
+global log_system
+
 
 class LogSystem:
     def __init__(
@@ -28,3 +30,16 @@ class LogSystem:
     def info_input(self, *msg):
         self._print("INFO", "".join(msg), False)
         return input()
+
+
+def info_print(*msg):
+    log_system.info_print("".join(msg))
+
+
+def info_input(*msg):
+    return log_system.info_input("".join(msg))
+
+
+def log_main():
+    global log_system
+    log_system = LogSystem()
