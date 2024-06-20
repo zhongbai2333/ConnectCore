@@ -32,7 +32,7 @@ def restart_program():
 # 启动服务器
 def start_server():
     from connect_core.cli.create_key import create_ssl_key
-    from connect_core.https.http_server import https_main
+    from connect_core.http.http_server import http_main
 
     info_print(
         translate()["connect_core"]["cli"]["starting"]["welcome"].format(
@@ -45,10 +45,10 @@ def start_server():
         )
     )
     create_ssl_key(config()["ip"])
-    # 创建 https服务器 线程
-    https_server_thread = threading.Thread(target=https_main)
-    https_server_thread.daemon = True
-    https_server_thread.start()
+    # 创建 http服务器 线程
+    http_server_thread = threading.Thread(target=http_main)
+    http_server_thread.daemon = True
+    http_server_thread.start()
     try:
         while True:
             sleep(1)
@@ -57,17 +57,10 @@ def start_server():
         sys.exit(0)
 
 
-# 随机字符串 -> 生成密钥
-def create_string_number(n) -> str:
-    m = random.randint(1, n)
-    a = "".join([str(random.randint(0, 9)) for _ in range(m)])
-    b = "".join([random.choice(string.ascii_letters) for _ in range(n - m)])
-    return "".join(random.sample(list(a + b), n))
-
-
 # 第一次启动配置
 def initialization_config() -> dict:
     from connect_core.cli.storage import YmlLanguage
+    from cryptography.fernet import Fernet
 
     lang = info_input("Choose language | 请选择语言: [EN_US/zh_cn] ")
     lang = lang if lang else "en_us"
@@ -82,13 +75,13 @@ def initialization_config() -> dict:
         translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
     )
     port = int(port) if port else 23233
-    https_port = info_input(
+    http_port = info_input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
-            "enter_https_port"
+            "enter_http_port"
         ]
     )
-    https_port = int(https_port) if https_port else 4443
-    password_create = create_string_number(10)
+    http_port = int(http_port) if http_port else 4443
+    password_create = Fernet.generate_key().decode()
     password = info_input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_password"
@@ -99,6 +92,6 @@ def initialization_config() -> dict:
         "language": lang,
         "ip": ip,
         "port": port,
-        "https_port": https_port,
+        "http_port": http_port,
         "password": password,
     }

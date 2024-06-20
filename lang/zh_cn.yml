@@ -3,11 +3,11 @@ connect_core:
     initialization_config:
       enter_ip: "请输入服务器IP/域名(公网): [127.0.0.1] "
       enter_port: "请输入服务器端口: [23233] "
-      enter_https_port: "请输入HTTPS 文件服务器端口：[4443] "
-      enter_password: "请输入群服务器密码: [{}] "
+      enter_http_port: "请输入HTTP 文件服务器端口：[4443] "
+      enter_password: "请输入群服务器密钥: [{}] "
       finish: "已将配置文件保存至 config.json, 程序将在3秒后重启..."
     starting:
       welcome: "请将群组重定向至 {}"
       welcome_password: "群组密钥为 {}"
     service:
-      start_https: "HTTPS 文件服务器已启动于 {}"
+      start_http: "HTTP 文件服务器已启动于 {}"
