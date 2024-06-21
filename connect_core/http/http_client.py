@@ -1,12 +1,9 @@
 import requests, os
 from cryptography.fernet import Fernet
 
-# 使用与服务器相同的密钥
-SECRET_KEY = b"bExE48Yv_secIarHXuvgy4KNW9_jFbePgaq_D0MmzV4="  # 使用生成的32位密钥
-fernet = Fernet(SECRET_KEY)
 
-
-def upload_file(url, file_path):
+def upload_file(url: str, file_path: str, key: str) -> int:
+    fernet = Fernet(key)
     with open(file_path, "rb") as file:
         file_data = file.read()
         encrypted_data = fernet.encrypt(file_data)
@@ -15,12 +12,13 @@ def upload_file(url, file_path):
     response = requests.post(url, files=files)
 
     if response.status_code == 200:
-        print("File uploaded successfully")
+        return 200
     else:
-        print("Failed to upload file:", response.status_code)
+        return response.status_code
 
 
-def download_file(url, save_path):
+def download_file(url: str, save_path: str, key:str) -> int:
+    fernet = Fernet(key)
     response = requests.get(url)
 
     if response.status_code == 200:
@@ -29,11 +27,7 @@ def download_file(url, save_path):
 
         with open(save_path, "wb") as f:
             f.write(file_data)
-        print(f"File downloaded and saved as {save_path}")
+        return 200
     else:
-        print("Failed to download file:", response.status_code)
+        return response.status_code
 
-
-# 示例使用
-upload_file("http://127.0.0.1:4443/upload", "README.md")
-download_file("http://127.0.0.1:4443/send_files/README.md", "downloaded_README.md")
