@@ -6,7 +6,7 @@ import cgi
 from cryptography.fernet import Fernet
 
 from connect_core.cli.get_config_translate import translate, config
-from connect_core.cli.log_system import info_print
+from connect_core.log_system import info_print
 
 global fernet
 

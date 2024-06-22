@@ -3,7 +3,7 @@ connect_core:
     initialization_config:
       enter_ip: "请输入服务器IP/域名(公网): [127.0.0.1] "
       enter_port: "请输入服务器端口: [23233] "
-      enter_http_port: "请输入HTTP 文件服务器端口：[4443] "
+      enter_http_port: "请输入 HTTP 文件服务器端口：[4443] "
       enter_password: "请输入群服务器密钥: [{}] "
       finish: "已将配置文件保存至 config.json, 程序将在3秒后重启..."
     starting:

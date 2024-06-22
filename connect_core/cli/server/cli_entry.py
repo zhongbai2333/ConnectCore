@@ -1,7 +1,7 @@
-import random, string, sys, os, threading
+import sys, os, threading
 
 from time import sleep
-from connect_core.cli.log_system import info_input, info_print
+from connect_core.log_system import info_input, info_print
 from connect_core.cli.get_config_translate import config, translate
 
 global translate_temp
@@ -11,7 +11,7 @@ def main():
     from connect_core.cli.storage import JsonDataEditor
 
     config_edit = JsonDataEditor()
-    info_print("\nConnectCore Starting...")
+    info_print("\nConnectCore Server Starting...")
     # 判断是否是第一次启动
     if config_edit.read():
         start_server()

@@ -14,7 +14,7 @@ def start_client_cli():
 
 
 if __name__ == "__main__":
-    from connect_core.cli.log_system import log_main, info_print
+    from connect_core.log_system import log_main, info_print
 
     log_main()
     if len(sys.argv) > 1:
