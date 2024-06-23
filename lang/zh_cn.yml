@@ -11,3 +11,5 @@ connect_core:
       welcome_password: "群组密钥为 {}"
     service:
       start_http: "HTTP 文件服务器已启动于 {}"
+      start_websocket: "Websocket 启动成功！"
+      stop_websocket: "Websocket 已关闭！"

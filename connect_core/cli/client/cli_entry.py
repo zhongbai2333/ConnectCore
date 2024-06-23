@@ -1,7 +1,7 @@
 import os, sys
 from time import sleep
 from connect_core.log_system import info_print, info_input
-from connect_core.cli.get_config_translate import config, translate
+from connect_core.get_config_translate import config, translate
 
 global translate_temp
 
@@ -10,7 +10,7 @@ def main():
     from connect_core.cli.storage import JsonDataEditor
 
     config_edit = JsonDataEditor()
-    info_print("\nConnectCore Server Starting...")
+    info_print("\nConnectCore Client Starting...")
     # 判断是否是第一次启动
     if config_edit.read():
         start_server()

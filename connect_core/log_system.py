@@ -1,6 +1,6 @@
 import time, os
 
-from mcdreforged.api.all import *
+from mcdreforged.api.all import PluginServerInterface
 
 global log_system
 

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 import cgi
 from cryptography.fernet import Fernet
 
-from connect_core.cli.get_config_translate import translate, config
+from connect_core.get_config_translate import translate, config
 from connect_core.log_system import info_print
 
 global fernet
@@ -97,13 +97,13 @@ def http_main():
 
     def run(server_class=ThreadingHTTPServer, handler_class=SimpleHTTPRequestHandler):
         global fernet
-        server_address = (config()["ip"], config()["http_port"])
-        fernet = Fernet(config()["password"].encode())
+        server_address = (config("ip"), config("http_port"))
+        fernet = Fernet(config("password").encode())
         httpd = server_class(server_address, handler_class)
         if not os.path.exists("send_files/"):
             os.makedirs("send_files/")
         info_print(
-            translate()["connect_core"]["cli"]["service"]["start_http"].format(
+            translate("cli.service.start_http").format(
                 f"{server_address[0]}:{server_address[1]}"
             )
         )

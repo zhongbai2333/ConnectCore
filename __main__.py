@@ -15,8 +15,10 @@ def start_client_cli():
 
 if __name__ == "__main__":
     from connect_core.log_system import log_main, info_print
+    from connect_core.get_config_translate import c_t_main
 
     log_main()
+    c_t_main()
     if len(sys.argv) > 1:
         if sys.argv[1] == "server":
             start_server_cli()

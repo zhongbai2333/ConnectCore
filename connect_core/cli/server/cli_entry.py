@@ -2,7 +2,7 @@ import sys, os, threading
 
 from time import sleep
 from connect_core.log_system import info_input, info_print
-from connect_core.cli.get_config_translate import config, translate
+from connect_core.get_config_translate import config, translate
 
 global translate_temp
 
@@ -31,20 +31,16 @@ def restart_program():
 
 # 启动服务器
 def start_server():
-    from connect_core.cli.create_key import create_ssl_key
     from connect_core.http.http_server import http_main
 
     info_print(
-        translate()["connect_core"]["cli"]["starting"]["welcome"].format(
-            f"{config()['ip']}:{config()['port']}"
+        translate("cli.starting.welcome").format(
+            f"{config('ip')}:{config('port')}"
         )
     )
     info_print(
-        translate()["connect_core"]["cli"]["starting"]["welcome_password"].format(
-            config()["password"]
-        )
+        translate("cli.starting.welcome_password").format(config("password"))
     )
-    create_ssl_key(config()["ip"])
     # 创建 http服务器 线程
     http_server_thread = threading.Thread(target=http_main)
     http_server_thread.daemon = True
