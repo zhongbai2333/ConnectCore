@@ -45,6 +45,14 @@ class LogSystem:
         else:
             self._print("ERROR", "".join(msg))
 
+    def debug_print(self, *msg) -> None:
+        from connect_core.get_config_translate import config
+        if config("debug"):
+            if self.mcdr_core:
+                self.mcdr_core.logger.info("[DEBUG] " + "".join(msg))
+            else:
+                self._print("DEBUG", "".join(msg))
+
     def info_input(self, *msg) -> str:
         self._print("INFO", "".join(msg), False)
         return input()
@@ -60,6 +68,10 @@ def warn_print(*msg) -> None:
 
 def error_print(*msg) -> None:
     log_system.error_print("".join(msg))
+
+
+def debug_print(*msg) -> None:
+    log_system.debug_print("".join(msg))
 
 
 def info_input(*msg) -> str:

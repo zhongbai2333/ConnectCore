@@ -9,7 +9,15 @@ connect_core:
     starting:
       welcome: "请将群组重定向至 {}"
       welcome_password: "群组密钥为 {}"
+  net_core:
     service:
       start_http: "HTTP 文件服务器已启动于 {}"
       start_websocket: "Websocket 启动成功！"
+      connect_websocket: "Websocket 连接成功！"
       stop_websocket: "Websocket 已关闭！"
+      disconnect_websocket: "已与主服务器断开连接！"
+      stop_receive: "Receive 服务已退出！"
+      disconnect_from_sub_websocket: "子服务器 {} 已与 Main Websockets 断开连接！"
+      disconnect_from_unknown_websocket: "Main Websockets 已断开一个陌生的连接！"
+  rsa:
+    decrypt_error: "密钥错误或数据被篡改！({})"

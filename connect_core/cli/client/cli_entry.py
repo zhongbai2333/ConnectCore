@@ -28,6 +28,22 @@ def restart_program():
     os.execl(python, python, *sys.argv)
 
 
+def start_server():
+    from connect_core.websocket.websocket_client import websocket_client_init
+
+    info_print(
+        translate("cli.starting.welcome").format(f"{config('ip')}:{config('port')}")
+    )
+    info_print(translate("cli.starting.welcome_password").format(config("password")))
+    websocket_client_init()
+    try:
+        while True:
+            sleep(1)
+    except KeyboardInterrupt:
+        print()
+        sys.exit(0)
+
+
 def initialization_config():
     from connect_core.cli.storage import YmlLanguage
 
@@ -63,4 +79,5 @@ def initialization_config():
         "port": port,
         "http_port": http_port,
         "password": password,
+        "debug": False,
     }

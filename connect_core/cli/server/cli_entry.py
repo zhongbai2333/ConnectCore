@@ -32,6 +32,7 @@ def restart_program():
 # 启动服务器
 def start_server():
     from connect_core.http.http_server import http_main
+    from connect_core.websocket.websocket_server import websocket_server_init
 
     info_print(
         translate("cli.starting.welcome").format(
@@ -44,7 +45,11 @@ def start_server():
     # 创建 http服务器 线程
     http_server_thread = threading.Thread(target=http_main)
     http_server_thread.daemon = True
+    # 创建 websocket服务器 线程
+    websocket_server_thread = threading.Thread(target=websocket_server_init)
+    websocket_server_thread.daemon = True
     http_server_thread.start()
+    websocket_server_thread.start()
     try:
         while True:
             sleep(1)
@@ -90,4 +95,5 @@ def initialization_config() -> dict:
         "port": port,
         "http_port": http_port,
         "password": password,
+        "debug": False,
     }

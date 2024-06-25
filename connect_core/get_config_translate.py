@@ -9,7 +9,10 @@ def config(key: str):
     if __mcdr_server:
         pass
     else:
-        return JsonDataEditor().read()[key]
+        if JsonDataEditor().read():
+            return JsonDataEditor().read()[key]
+        else:
+            return None
 
 
 def translate(key: str):
@@ -19,6 +22,10 @@ def translate(key: str):
         key_n = "connect_core." + key
         key_n = key_n.split(".")
         return get_nested_value(YmlLanguage(config("language")).translate, key_n)
+
+
+def is_mcdr() -> bool:
+    return True if __mcdr_server else False
 
 
 def get_nested_value(data, keys_path, default=None):

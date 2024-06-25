@@ -3,12 +3,10 @@ from socketserver import ThreadingMixIn
 import os
 from urllib.parse import urlparse
 import cgi
-from cryptography.fernet import Fernet
 
 from connect_core.get_config_translate import translate, config
 from connect_core.log_system import info_print
-
-global fernet
+from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
 
 def http_main():
@@ -23,7 +21,7 @@ def http_main():
             if os.path.isfile(file_path):
                 with open(file_path, "rb") as f:
                     file_data = f.read()
-                encrypted_data = fernet.encrypt(file_data)
+                encrypted_data = rsa_encrypt(file_data)
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
@@ -57,7 +55,7 @@ def http_main():
 
                     # 解密文件数据
                     try:
-                        file_data = fernet.decrypt(encrypted_data)
+                        file_data = rsa_decrypt(encrypted_data)
                     except Exception as e:
                         self.send_response(400)
                         self.end_headers()
@@ -96,14 +94,12 @@ def http_main():
                 self.wfile.write(b"Invalid Content-Type")
 
     def run(server_class=ThreadingHTTPServer, handler_class=SimpleHTTPRequestHandler):
-        global fernet
         server_address = (config("ip"), config("http_port"))
-        fernet = Fernet(config("password").encode())
         httpd = server_class(server_address, handler_class)
         if not os.path.exists("send_files/"):
             os.makedirs("send_files/")
         info_print(
-            translate("cli.service.start_http").format(
+            translate("net_core.service.start_http").format(
                 f"{server_address[0]}:{server_address[1]}"
             )
         )
