@@ -27,7 +27,7 @@ def rsa_decrypt(data: bytes):
         try:
             return fernet.decrypt(data)
         except InvalidToken as e:
-            error_print(translate("rsa.decrypt_error").format(e))
+            error_print(translate("rsa.decrypt_error"))
             raise InvalidToken(e)
     else:
         raise InvalidToken("Passowrd init Error or data error!")

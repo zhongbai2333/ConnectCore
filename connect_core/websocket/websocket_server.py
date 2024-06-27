@@ -75,6 +75,7 @@ class WebsocketServer:
                             server_id = self.create_string_number(5)
                         self.websockets[server_id] = websocket
                         self.broadcast_websockets.add(websocket)
+                        info_print(translate("net_core.service.connect_websocket").format(f"Server {server_id}"))
                         await self.send_msg(websocket,
                             {
                                 "s": 1,
@@ -85,7 +86,8 @@ class WebsocketServer:
                         )
                 except Exception as e:
                     debug_print(f"子服务器连接错误：{e}")
-                    await websocket.close(reason="Token Password!")  # 密码错误关闭连接
+                    await websocket.close(reason="400")  # 密码错误关闭连接
+                    self.close_connect()
                     break
             except (
                 websockets.exceptions.ConnectionClosedOK,

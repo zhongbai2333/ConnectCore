@@ -1,4 +1,4 @@
-import websockets, json, asyncio, threading
+import websockets, json, asyncio, threading, sys
 from mcdreforged.api.all import new_thread
 
 from connect_core.log_system import info_print, warn_print, error_print, debug_print
@@ -34,6 +34,8 @@ class WebsocketClient:
         self.finish_close = False
         self.host = config("ip")
         self.port = config("port")
+        self.main_task = None
+        self.receive_task = None
 
     def start_server(self) -> None:
         asyncio.run(self.init_main())
@@ -42,6 +44,7 @@ class WebsocketClient:
         if self.receive_task:
             self.receive_task.cancel()
         else:
+            self.main_task.cancel()
             self.finish_quit = True
             pass
 
@@ -49,8 +52,9 @@ class WebsocketClient:
         self.main_task = asyncio.create_task(self.main())
         try:
             await self.main_task
+            info_print(translate("net_core.service.stop_websocket"))
         except asyncio.CancelledError:
-            info_print(translate("net_core.service.start_websocket"))
+            info_print(translate("net_core.service.stop_websocket"))
 
     async def main(self):
         while True:
@@ -59,7 +63,7 @@ class WebsocketClient:
                     f"ws://{self.host}:{self.port}"
                 ) as self.websocket:
                     self.finish_start = True
-                    info_print(translate("net_core.service.connect_websocket"))
+                    info_print(translate("net_core.service.connect_websocket").format(""))
                     await self.receive()
                 break
             except ConnectionRefusedError:
@@ -71,7 +75,9 @@ class WebsocketClient:
             {
                 "s": 1,
                 "status": "Connect",
-                "data": {},
+                "data": {
+                    "path": sys.argv[0]
+                },
             }
         )
         while True:
@@ -81,7 +87,7 @@ class WebsocketClient:
                 if recv_data:
                     recv_data = rsa_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
-                    debug_print(f"已收到 子服务器 数据包：{recv_data}")
+                    debug_print(f"已收到 主服务器 数据包：{recv_data}")
                     # TODO: MSG_PRASE Server
                 else:
                     break
@@ -96,10 +102,15 @@ class WebsocketClient:
                 return await asyncio.wait_for(self.websocket.recv(), timeout=4)
             except asyncio.TimeoutError:
                 pass
-            except (websockets.ConnectionClosedError, websockets.ConnectionClosedOK):
-                info_print(translate("net_core.service.disconnect_websocket"))
-                websocket_client_init()
-                return None
+            except (websockets.ConnectionClosedError, websockets.ConnectionClosedOK) as e:
+                if str(e) != "received 1000 (OK) 400; then sent 1000 (OK) 400":
+                    info_print(translate("net_core.service.disconnect_websocket") + str(e))
+                    websocket_client_init()
+                    return None
+                else:
+                    error_print(translate("net_core.service.error_password"))
+                    self.stop_server()
+                    return None
 
     async def send_msg(self, msg: dict) -> None:
         await self.websocket.send(rsa_encrypt(json.dumps(msg).encode()))
