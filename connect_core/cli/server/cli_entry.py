@@ -52,10 +52,34 @@ def start_server():
     websocket_server_thread.start()
     try:
         while True:
-            sleep(1)
+            command_system()
     except KeyboardInterrupt:
         print()
         sys.exit(0)
+
+
+def command_system() -> None:
+    cmd = info_input(">>")
+    match cmd:
+        case "list":
+            from connect_core.websocket.websocket_server import get_server_list
+
+            info_print("==list==")
+            server_list = get_server_list()
+            for num, key in enumerate(server_list.keys()):
+                info_print(f"{num + 1}. {key}: {server_list[key]['path']}")
+            return None
+        case "exit":
+            info_print("Bye!")
+            sys.exit(0)
+        case "stop":
+            info_print("Bye!")
+            sys.exit(0)
+        case "":
+            return None
+        case _:
+            info_print(translate("cli.server_commands.help"))
+            return None
 
 
 # 第一次启动配置

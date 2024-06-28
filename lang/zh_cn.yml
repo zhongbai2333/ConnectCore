@@ -9,6 +9,16 @@ connect_core:
     starting:
       welcome: "请将群组重定向至 {}"
       welcome_password: "群组密钥为 {}"
+    server_commands:
+      help: "==help==\n
+      help: 获取帮助列表\n
+      list: 获取子服务器列表\n
+      exit | stop: 退出"
+    client_commands:
+      help: "==help==\n
+      help: 获取帮助列表\n
+      info: 获取服务器状态\n
+      exit | stop: 退出"
   net_core:
     service:
       start_http: "HTTP 文件服务器已启动于 {}"

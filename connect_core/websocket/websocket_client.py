@@ -6,6 +6,9 @@ from connect_core.get_config_translate import config, translate, is_mcdr
 from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
 
+global websocket_client
+
+
 def websocket_client_init():
     if is_mcdr():
         mcdr_start()
@@ -15,17 +18,24 @@ def websocket_client_init():
         websocket_client_thread.start()
 
 
+def get_server_id() -> str:
+    if websocket_client:
+        return websocket_client.server_id
+    else:
+        return None
+
+
 def cli_start():
-    global group_server
-    group_server = WebsocketClient()
-    group_server.start_server()
+    global websocket_client
+    websocket_client = WebsocketClient()
+    websocket_client.start_server()
 
 
 @new_thread("Websocket_Server")
 def mcdr_start():
-    global group_server
-    group_server = WebsocketClient()
-    group_server.start_server()
+    global websocket_client
+    websocket_client = WebsocketClient()
+    websocket_client.start_server()
 
 
 class WebsocketClient:
@@ -36,6 +46,7 @@ class WebsocketClient:
         self.port = config("port")
         self.main_task = None
         self.receive_task = None
+        self.server_id = None
 
     def start_server(self) -> None:
         asyncio.run(self.init_main())
@@ -88,7 +99,7 @@ class WebsocketClient:
                     recv_data = rsa_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
                     debug_print(f"已收到 主服务器 数据包：{recv_data}")
-                    # TODO: MSG_PRASE Server
+                    self.msg_prase(recv_data)
                 else:
                     break
             except asyncio.CancelledError:
@@ -114,3 +125,11 @@ class WebsocketClient:
 
     async def send_msg(self, msg: dict) -> None:
         await self.websocket.send(rsa_encrypt(json.dumps(msg).encode()))
+
+    def get_msg_dict(self, s: int, s_to_id: str, s_from_id: str, data: dict) -> dict:
+        return {"s": s, "id": s_to_id, "from": s_from_id, "data": data}
+
+    def msg_prase(self, msg: dict):
+        match msg['s']:
+            case 1:
+                self.server_id = msg["id"]
