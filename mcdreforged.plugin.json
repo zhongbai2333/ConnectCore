@@ -7,7 +7,7 @@
     "zh_cn": "将你的Minecraft Server连接到一起并控制。"
   },
   "author": "zhongbai233",
-  "link": "https://github.com/zhongbai2333/ConnetCore",
+  "link": "https://github.com/zhongbai2333/ConnectCore",
   "dependencies": {
   },
   "entrypoint": "connect_core.mcdr.mcdr_entry",
