@@ -35,13 +35,9 @@ def start_server():
     from connect_core.websocket.websocket_server import websocket_server_init
 
     info_print(
-        translate("cli.starting.welcome").format(
-            f"{config('ip')}:{config('port')}"
-        )
+        translate("cli.starting.welcome").format(f"{config('ip')}:{config('port')}")
     )
-    info_print(
-        translate("cli.starting.welcome_password").format(config("password"))
-    )
+    info_print(translate("cli.starting.welcome_password").format(config("password")))
     # 创建 http服务器 线程
     http_server_thread = threading.Thread(target=http_main)
     http_server_thread.daemon = True
@@ -50,36 +46,9 @@ def start_server():
     websocket_server_thread.daemon = True
     http_server_thread.start()
     websocket_server_thread.start()
-    try:
-        while True:
-            command_system()
-    except KeyboardInterrupt:
-        print()
-        sys.exit(0)
+    from connect_core.cli.cli_core import cli_core_init
 
-
-def command_system() -> None:
-    cmd = info_input(">>")
-    match cmd:
-        case "list":
-            from connect_core.websocket.websocket_server import get_server_list
-
-            info_print("==list==")
-            server_list = get_server_list()
-            for num, key in enumerate(server_list.keys()):
-                info_print(f"{num + 1}. {key}: {server_list[key]['path']}")
-            return None
-        case "exit":
-            info_print("Bye!")
-            sys.exit(0)
-        case "stop":
-            info_print("Bye!")
-            sys.exit(0)
-        case "":
-            return None
-        case _:
-            info_print(translate("cli.server_commands.help"))
-            return None
+    cli_core_init(True)
 
 
 # 第一次启动配置

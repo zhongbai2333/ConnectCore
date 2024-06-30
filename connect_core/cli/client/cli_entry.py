@@ -36,38 +36,9 @@ def start_server():
     )
     info_print(translate("cli.starting.welcome_password").format(config("password")))
     websocket_client_init()
-    try:
-        while True:
-            command_system()
-    except KeyboardInterrupt:
-        print()
-        sys.exit(0)
+    from connect_core.cli.cli_core import cli_core_init
 
-
-def command_system() -> None:
-    cmd = info_input(">>")
-    match cmd:
-        case "info":
-            from connect_core.websocket.websocket_client import get_server_id
-
-            info_print("==info==")
-            server_id = get_server_id()
-            if server_id:
-                info_print(f"Main Server Connected! Server ID: {server_id}")
-            else:
-                info_print("Main Server Disconnected!")
-            return None
-        case "exit":
-            info_print("Bye!")
-            sys.exit(0)
-        case "stop":
-            info_print("Bye!")
-            sys.exit(0)
-        case "":
-            return None
-        case _:
-            info_print(translate("cli.client_commands.help"))
-            return None
+    cli_core_init(False)
 
 
 def initialization_config():
