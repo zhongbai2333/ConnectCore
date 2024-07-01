@@ -51,6 +51,19 @@ class MyServerCmd(cmd.Cmd):
         for num, key in enumerate(server_list.keys()):
             info_print(f"{num + 1}. {key}: {server_list[key]['path']}")
 
+    def do_send(self, args):
+        """Send file and msg"""
+        commands = args.split()
+        if len(commands) != 3:
+            info_print(translate("cli.server_commands.send"))
+            return None
+        if commands[0] == "msg":
+            pass
+        elif commands[0] == "file":
+            pass
+        else:
+            info_print(translate("cli.server_commands.send"))
+
     def do_exit(self, args):
         """Exit this program"""
         print("Goodbye!")

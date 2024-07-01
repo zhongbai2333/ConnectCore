@@ -92,6 +92,10 @@ def http_main():
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(b"Invalid Content-Type")
+        
+        def log_message(self, format, *args):
+            info_print(f"[HTTP] [{self.address_string()}] {format % args}")
+
 
     def run(server_class=ThreadingHTTPServer, handler_class=SimpleHTTPRequestHandler):
         server_address = (config("ip"), config("http_port"))
