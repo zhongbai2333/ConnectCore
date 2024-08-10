@@ -1,3 +1,36 @@
 connect_core:
   cli:
-    
+    initialization_config:
+      enter_ip: "Please enter the server IP/domain (Public): [127.0.0.1] "
+      enter_port: "Please enter the server port: [23233] "
+      enter_http_port: "Please enter the HTTP file server port: [4443] "
+      enter_password: "Please enter the group server key: [{}] "
+      finish: "Configuration saved to config.json, the program will restart in 3 seconds..."
+    starting:
+      welcome: "Please redirect the group to {}"
+      welcome_password: "The group key is {}"
+    server_commands:
+      help: "==help==\n
+      help: Get help list\n
+      send: Send a message or file\n
+      list: Get the sub-server list\n
+      exit: Exit"
+      send: "send <msg|file> <ID> <[msg]|[path]> Send a file or message"
+    client_commands:
+      help: "==help==\n
+      help: Get help list\n
+      info: Get server status\n
+      exit: Exit"
+  net_core:
+    service:
+      start_http: "HTTP file server started at {}"
+      start_websocket: "Websocket started successfully!"
+      connect_websocket: "Websocket connected successfully! {}"
+      stop_websocket: "Websocket has been closed!"
+      disconnect_websocket: "Disconnected from the main server, attempting to reconnect!"
+      stop_receive: "Receive service has exited!"
+      disconnect_from_sub_websocket: "Sub-server {} has disconnected from Main Websockets!"
+      disconnect_from_unknown_websocket: "Main Websockets disconnected an unknown connection!"
+      error_password: "Incorrect key! Please modify the key and reload the plugin!"
+  rsa:
+    decrypt_error: "Decryption failed, incorrect key or data has been tampered with!"

@@ -13,12 +13,15 @@ def start_client_cli():
     main()
 
 
+# First Start Point
 if __name__ == "__main__":
-    from connect_core.log_system import log_main, info_print
+    from connect_core.log_system import info_print
     from connect_core.module_initialization import module_initialization_main
 
-    log_main()
+    # 初始化
     module_initialization_main()
+
+    # 根据启动命令控制
     if len(sys.argv) > 1:
         if sys.argv[1] == "server":
             start_server_cli()

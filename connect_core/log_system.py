@@ -15,7 +15,7 @@ class LogSystem:
     ) -> None:
         if not os.path.exists(path):
             os.makedirs(path)
-        if filelog is None:
+        if not filelog:
             filelog = f"Log-{time.strftime('%b_%d-%H_%M_%S', time.localtime())}.log"
         self.logfile = os.path.join(path, filelog)
         self.mcdr_core = mcdr_core

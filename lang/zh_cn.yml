@@ -15,7 +15,7 @@ connect_core:
       send: 发送消息或文件\n
       list: 获取子服务器列表\n
       exit: 退出"
-      send: "send msg|file <ID> <msg>|<path> 发送文件或消息"
+      send: "send <msg|file> <ID> <[msg]|[path]> 发送文件或消息"
     client_commands:
       help: "==help==\n
       help: 获取帮助列表\n
