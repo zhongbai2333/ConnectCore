@@ -1,6 +1,6 @@
 import sys, os, threading
 from time import sleep
-from connect_core.log_system import info_input, info_print
+from connect_core.cli_core import info_print
 from connect_core.get_config_translate import config, translate
 
 global translate_temp
@@ -50,10 +50,65 @@ def start_server():
     start_servers_thread = threading.Thread(target=start_servers)
     start_servers_thread.start()
 
-    from connect_core.cli.cli_core import cli_core_init
+    from connect_core.cli_core import (
+        add_command,
+        start_cli_core,
+        set_completer_words,
+        set_prompt,
+    )
+    from connect_core.websocket.websocket_server import get_servers_info, send_msg
 
     # 启动核心命令行程序
-    cli_core_init(True)
+    def do_list(args):
+        """
+        显示当前可用的子服务器列表。
+        """
+        info_print("==list==")
+        server_list = get_servers_info()
+        for num, key in enumerate(server_list.keys()):
+            info_print(f"{num + 1}. {key}: {server_list[key]['path']}")
+
+    def do_send(args):
+        """
+        向指定服务器发送消息或文件。
+        """
+
+        commands = args.split()
+        if len(commands) != 3:
+            info_print(translate("cli.server_commands.send"))
+            return None
+
+        server_name, content = commands[1], commands[2]
+        if commands[0] == "msg" and (
+            server_name == "all" or server_name in get_servers_info()
+        ):
+            send_msg(server_name, content)
+        elif commands[0] == "file":
+            pass  # Implement file sending logic here
+        else:
+            info_print(translate("cli.server_commands.send"))
+
+    def do_help(args):
+        """
+        显示所有可用命令的帮助信息。
+        """
+        info_print(translate("cli.server_commands.help"))
+
+    add_command("help", do_help)
+    add_command("list", do_list)
+    add_command("send", do_send)
+
+    set_completer_words(
+        {
+            "help": None,
+            "list": None,
+            "send": {"msg": {"all": None}, "file": {"all": None}},
+        }
+    )
+
+    set_prompt("ConnectCoreServer> ")
+
+    start_cli_core()
 
 
 def start_servers():
@@ -89,7 +144,7 @@ def initialization_config() -> dict:
     from cryptography.fernet import Fernet
 
     # 选择语言
-    lang = info_input("Choose language | 请选择语言: [EN_US/zh_cn] ")
+    lang = input("Choose language | 请选择语言: [EN_US/zh_cn] ")
     lang = lang if lang else "en_us"
     lang.lower()
 
@@ -97,19 +152,19 @@ def initialization_config() -> dict:
     translate_temp = YmlLanguage(lang).translate
 
     # 输入IP地址
-    ip = info_input(
+    ip = input(
         translate_temp["connect_core"]["cli"]["initialization_config"]["enter_ip"]
     )
     ip = ip if ip else "127.0.0.1"
 
     # 输入端口
-    port = info_input(
+    port = input(
         translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
     )
     port = int(port) if port else 23233
 
     # 输入HTTP端口
-    http_port = info_input(
+    http_port = input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_http_port"
         ]
@@ -118,7 +173,7 @@ def initialization_config() -> dict:
 
     # 生成和输入密码
     password_create = Fernet.generate_key().decode()
-    password = info_input(
+    password = input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_password"
         ].format(password_create)

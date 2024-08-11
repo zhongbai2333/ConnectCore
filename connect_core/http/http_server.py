@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 import cgi
 
 from connect_core.get_config_translate import translate, config
-from connect_core.log_system import info_print
+from connect_core.cli_core import info_print
 from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
 

@@ -5,7 +5,7 @@ import random
 import string
 from mcdreforged.api.all import new_thread
 
-from connect_core.log_system import info_print, warn_print, error_print, debug_print
+from connect_core.cli_core import info_print, warn_print, error_print, debug_print
 from connect_core.get_config_translate import config, translate, is_mcdr
 from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
@@ -44,6 +44,30 @@ def send_msg(server_id: str, msg: str) -> None:
         msg (str): 要发送的消息内容。
     """
     websocket_server.send_msg_to_sub_server(server_id, msg)
+
+
+def flush_completer(server_list: list):
+    """
+    刷新服务器列表提示词，并更新命令行补全器。
+
+    Args:
+        server_list (list): 服务器列表
+
+    Returns:
+        completer (dict): 重制后的提示词
+    """
+    if is_mcdr():
+        return None
+
+    server_dict = {server: None for server in server_list}
+    server_dict["all"] = None
+    completer = {
+        "list": None,
+        "send": {"msg": server_dict, "file": server_dict},
+        "exit": None,
+        "help": None,
+    }
+    return completer
 
 
 @new_thread("Websocket_Server")
@@ -151,9 +175,14 @@ class WebsocketServer:
                         self.broadcast_websockets.add(websocket)
                         self.servers_info[server_id] = msg["data"]
 
-                        from connect_core.cli.cli_core import flush_completer
+                        from connect_core.cli_core import (
+                            set_completer_words,
+                            restart_cli_core,
+                        )
 
-                        flush_completer(list(self.websockets.keys()))
+                        completer = flush_completer(list(self.websockets.keys()))
+                        set_completer_words(completer)
+                        restart_cli_core()
 
                         info_print(
                             translate("net_core.service.connect_websocket").format(
@@ -197,7 +226,11 @@ class WebsocketServer:
             if websocket in self.broadcast_websockets:
                 self.broadcast_websockets.remove(websocket)
 
-            from connect_core.cli.cli_core import flush_completer
+            from connect_core.cli_core import set_completer_words, restart_cli_core
+
+            completer = flush_completer(list(self.websockets.keys()))
+            set_completer_words(completer)
+            restart_cli_core()
 
             flush_completer(list(self.websockets.keys()))
 

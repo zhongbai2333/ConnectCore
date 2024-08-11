@@ -6,7 +6,7 @@ import sys
 from time import sleep
 from mcdreforged.api.all import new_thread
 
-from connect_core.log_system import info_print, warn_print, error_print, debug_print
+from connect_core.cli_core import info_print, warn_print, error_print, debug_print
 from connect_core.get_config_translate import config, translate, is_mcdr
 from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 

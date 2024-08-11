@@ -6,6 +6,15 @@ global __mcdr_server
 
 
 def config(key: str):
+    """
+    获取配置文件相关信息
+
+    Args:
+        key (str): 配置文件关键字
+    
+    Returns:
+        item (str): 配置项, 如果key无效则为 None
+    """
     if __mcdr_server:
         pass
     else:
@@ -16,6 +25,15 @@ def config(key: str):
 
 
 def translate(key: str):
+    """
+    获取翻译项
+
+    Args:
+        key (str): 翻译文件关键字
+
+    Returns:
+        item (str): 翻译文本
+    """
     if __mcdr_server:
         return _tr(key)
     else:
@@ -25,6 +43,12 @@ def translate(key: str):
 
 
 def is_mcdr() -> bool:
+    """
+    获取运行环境是否为MCDR
+
+    Returns:
+        is_mcdr (bool): 返回布尔值
+    """
     return True if __mcdr_server else False
 
 

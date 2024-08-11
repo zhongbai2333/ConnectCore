@@ -1,6 +1,6 @@
 from cryptography.fernet import Fernet, InvalidToken
 from connect_core.get_config_translate import config, translate
-from connect_core.log_system import error_print, debug_print
+from connect_core.cli_core import error_print, debug_print
 
 global fernet
 

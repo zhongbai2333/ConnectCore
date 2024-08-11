@@ -1,6 +1,6 @@
 import os, sys
 from time import sleep
-from connect_core.log_system import info_print, info_input
+from connect_core.cli_core import info_print
 from connect_core.get_config_translate import config, translate
 
 global translate_temp
@@ -51,11 +51,40 @@ def start_server():
     # 启动WebSocket客户端
     websocket_client_init()
 
-    from connect_core.cli.cli_core import cli_core_init
+    from connect_core.cli_core import (
+        add_command,
+        start_cli_core,
+        set_completer_words,
+        set_prompt,
+    )
 
-    # 启动核心命令行程序
-    cli_core_init(False)
+    def do_info(args):
+        """
+        显示主服务器信息。
+        """
+        from connect_core.websocket.websocket_client import get_server_id
 
+        info_print("==info==")
+        server_id = get_server_id()
+        if server_id:
+            info_print(f"Main Server Connected! Server ID: {server_id}")
+        else:
+            info_print("Main Server Disconnected!")
+
+    def do_help(args):
+        """
+        显示所有可用命令的帮助信息。
+        """
+        info_print(translate("cli.client_commands.help"))
+
+    add_command("help", do_help)
+    add_command("info", do_info)
+
+    set_completer_words({"info": None, "exit": None, "help": None})
+
+    set_prompt("ConnectCoreClient> ")
+
+    start_cli_core()
 
 def initialization_config() -> dict:
     """
@@ -68,7 +97,7 @@ def initialization_config() -> dict:
     from connect_core.cli.storage import YmlLanguage
 
     # 选择语言
-    lang = info_input("Choose language | 请选择语言: [EN_US/zh_cn] ")
+    lang = input("Choose language | 请选择语言: [EN_US/zh_cn] ")
     lang = lang if lang else "en_us"
     lang.lower()
 
@@ -76,19 +105,19 @@ def initialization_config() -> dict:
     translate_temp = YmlLanguage(lang).translate
 
     # 输入IP地址
-    ip = info_input(
+    ip = input(
         translate_temp["connect_core"]["cli"]["initialization_config"]["enter_ip"]
     )
     ip = ip if ip else "127.0.0.1"
 
     # 输入端口
-    port = info_input(
+    port = input(
         translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
     )
     port = int(port) if port else 23233
 
     # 输入HTTP端口
-    http_port = info_input(
+    http_port = input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_http_port"
         ]
@@ -97,7 +126,7 @@ def initialization_config() -> dict:
 
     # 生成和输入密码
     password_create = "---"
-    password = info_input(
+    password = input(
         translate_temp["connect_core"]["cli"]["initialization_config"][
             "enter_password"
         ].format(password_create)
