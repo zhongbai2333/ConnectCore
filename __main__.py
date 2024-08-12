@@ -15,7 +15,7 @@ def start_client_cli():
 
 # First Start Point
 if __name__ == "__main__":
-    from connect_core.cli_core import info_print
+    from connect_core.api.log_system import info_print
     from connect_core.module_initialization import module_initialization_main
 
     # 初始化

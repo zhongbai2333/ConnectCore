@@ -1,5 +1,6 @@
 import os
 import time
+import html
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -36,14 +37,16 @@ class LogSystem:
         """
         输出带有时间戳和颜色的日志信息，同时写入日志文件。
 
-        Args:
+        Parameters:
             level (str): 日志级别，如'INFO'、'WARN'、'ERROR'、'DEBUG'。
             msg (str): 要记录的日志消息。
         """
         with open(self.logfile, "a", encoding="utf-8") as file:
             timestamp = time.strftime("%H:%M:%S", time.localtime())
             colored_level = self._get_colored_text(level)
-            formatted_message = f"[{timestamp}] {colored_level} {msg}"
+            # 使用 html.escape 转义日志消息中的特殊字符
+            escaped_msg = html.escape(msg)
+            formatted_message = f"[{timestamp}] {colored_level} {escaped_msg}"
             print_formatted_text(HTML(formatted_message))
             file.write(f"[{timestamp}] [{level}] {msg}\n")
 
@@ -261,6 +264,16 @@ def add_command(command, action) -> None:
         action (callable): 执行该命令的函数。
     """
     cli.add_command(command, action)
+
+
+def remove_command(command):
+    """
+    移除一个已注册的命令。
+
+    Args:
+        command (str): 要移除的命令名称。
+    """
+    cli.remove_command(command)
 
 
 def set_completer_words(words):

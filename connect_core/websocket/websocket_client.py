@@ -6,9 +6,9 @@ import sys
 from time import sleep
 from mcdreforged.api.all import new_thread
 
-from connect_core.cli_core import info_print, warn_print, error_print, debug_print
-from connect_core.get_config_translate import config, translate, is_mcdr
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.api.log_system import info_print, warn_print, error_print, debug_print
+from connect_core.api.c_t import config, translate, is_mcdr
+from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 
 global websocket_client
 
@@ -39,7 +39,7 @@ def get_server_id() -> str:
 
 def start_cli_server() -> None:
     """
-    启动命令行界面 (CLI) 线程客户端。
+    启动客户端。
     """
     global websocket_client
     websocket_client = WebsocketClient()

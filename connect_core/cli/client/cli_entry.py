@@ -1,7 +1,7 @@
 import os, sys
 from time import sleep
-from connect_core.cli_core import info_print
-from connect_core.get_config_translate import config, translate
+from connect_core.api.log_system import info_print
+from connect_core.api.c_t import config, translate
 
 global translate_temp
 
@@ -41,7 +41,7 @@ def start_server():
     """
     启动WebSocket客户端并初始化核心命令行程序。
     """
-    from connect_core.websocket.websocket_client import websocket_client_init
+    from connect_core.api.websocket.client import websocket_client_init
 
     info_print(
         translate("cli.starting.welcome").format(f"{config('ip')}:{config('port')}")
@@ -51,18 +51,19 @@ def start_server():
     # 启动WebSocket客户端
     websocket_client_init()
 
-    from connect_core.cli_core import (
+    from connect_core.api.cli_command import (
         add_command,
         start_cli_core,
         set_completer_words,
         set_prompt,
+        stop_cli_core,
     )
 
     def do_info(args):
         """
         显示主服务器信息。
         """
-        from connect_core.websocket.websocket_client import get_server_id
+        from connect_core.api.websocket.client import get_server_id
 
         info_print("==info==")
         server_id = get_server_id()
@@ -77,8 +78,15 @@ def start_server():
         """
         info_print(translate("cli.client_commands.help"))
 
+    def do_exit(args):
+        """
+        退出命令行系统
+        """
+        stop_cli_core()
+
     add_command("help", do_help)
     add_command("info", do_info)
+    add_command("exit", do_exit)
 
     set_completer_words({"info": None, "exit": None, "help": None})
 

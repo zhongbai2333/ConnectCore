@@ -1,7 +1,7 @@
 import sys, os, threading
 from time import sleep
-from connect_core.cli_core import info_print
-from connect_core.get_config_translate import config, translate
+from connect_core.api.log_system import info_print
+from connect_core.api.c_t import config, translate
 
 global translate_temp
 
@@ -50,13 +50,14 @@ def start_server():
     start_servers_thread = threading.Thread(target=start_servers)
     start_servers_thread.start()
 
-    from connect_core.cli_core import (
+    from connect_core.api.cli_command import (
         add_command,
         start_cli_core,
         set_completer_words,
         set_prompt,
+        stop_cli_core,
     )
-    from connect_core.websocket.websocket_server import get_servers_info, send_msg
+    from connect_core.api.websocket.server import get_servers_info, send_msg
 
     # 启动核心命令行程序
     def do_list(args):
@@ -94,15 +95,23 @@ def start_server():
         """
         info_print(translate("cli.server_commands.help"))
 
+    def do_exit(args):
+        """
+        退出命令行系统
+        """
+        stop_cli_core()
+
     add_command("help", do_help)
     add_command("list", do_list)
     add_command("send", do_send)
+    add_command("exit", do_exit)
 
     set_completer_words(
         {
             "help": None,
             "list": None,
             "send": {"msg": {"all": None}, "file": {"all": None}},
+            "exit": None,
         }
     )
 
@@ -115,8 +124,8 @@ def start_servers():
     """
     创建并启动HTTP和WebSocket服务器的线程。
     """
-    from connect_core.http.http_server import http_main
-    from connect_core.websocket.websocket_server import websocket_server_init
+    from connect_core.api.http import http_main
+    from connect_core.api.websocket.server import websocket_server_init
 
     sleep(0.3)
 

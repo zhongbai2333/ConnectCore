@@ -4,9 +4,9 @@ import os
 from urllib.parse import urlparse
 import cgi
 
-from connect_core.get_config_translate import translate, config
-from connect_core.cli_core import info_print
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.api.c_t import translate, config
+from connect_core.api.log_system import info_print
+from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 
 
 def http_main():

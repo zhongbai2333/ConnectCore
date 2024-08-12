@@ -1,33 +1,62 @@
 from cryptography.fernet import Fernet, InvalidToken
-from connect_core.get_config_translate import config, translate
-from connect_core.cli_core import error_print, debug_print
+from connect_core.api.c_t import config, translate
+from connect_core.api.log_system import error_print, debug_print
 
-global fernet
+# 全局变量，用于存储 Fernet 实例
+fernet = None
+
 
 def rsa_main():
+    """
+    初始化 Fernet 实例。如果配置中存在密码，则使用该密码初始化 Fernet。
+    """
     global fernet
 
-    if config("password"):
-        fernet = Fernet(config("password").encode())
+    password = config("password")
+    if password:
+        fernet = Fernet(password.encode())
     else:
         fernet = None
+        debug_print(translate("rsa.no_password_provided"))
 
 
-# 加密
-def rsa_encrypt(data: bytes):
+def rsa_encrypt(data: bytes) -> bytes:
+    """
+    加密数据
+
+    Args:
+        data (bytes): 需要加密的字节数据。
+
+    Returns:
+        bytes: 加密后的字节数据。
+
+    Exceptions:
+        InvalidToken: 如果未初始化密码或初始化错误时抛出异常。
+    """
     if fernet:
         return fernet.encrypt(data)
     else:
-        raise InvalidToken("Passowrd init Error!")
+        raise InvalidToken("Password initialization error!")
 
 
-# 解密
-def rsa_decrypt(data: bytes):
+def rsa_decrypt(data: bytes) -> bytes:
+    """
+    解密数据
+
+    Args:
+        data (bytes): 需要解密的字节数据。
+
+    Returns:
+        bytes: 解密后的字节数据。
+
+    Exceptions:
+        InvalidToken: 如果未初始化密码、数据为空或解密失败时抛出异常。
+    """
     if fernet and data:
         try:
             return fernet.decrypt(data)
         except InvalidToken as e:
             error_print(translate("rsa.decrypt_error"))
-            raise InvalidToken(e)
+            raise InvalidToken(f"Decryption failed: {e}")
     else:
-        raise InvalidToken("Passowrd init Error or data error!")
+        raise InvalidToken("Password initialization error or data error!")

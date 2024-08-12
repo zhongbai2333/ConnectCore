@@ -5,9 +5,9 @@ import random
 import string
 from mcdreforged.api.all import new_thread
 
-from connect_core.cli_core import info_print, warn_print, error_print, debug_print
-from connect_core.get_config_translate import config, translate, is_mcdr
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.api.log_system import info_print, warn_print, error_print, debug_print
+from connect_core.api.c_t import config, translate, is_mcdr
+from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 
 global websocket_server
 

@@ -15,7 +15,7 @@ connect_core:
       send: Send a message or file\n
       list: Get the sub-server list\n
       exit: Exit"
-      send: "send [msg|file] [ID] [msg]|[path] Send a file or message"
+      send: "send <msg|file> <ID> <[msg]|[path]> Send a file or message"
     client_commands:
       help: "==help==\n
       help: Get help list\n

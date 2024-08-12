@@ -1,34 +1,64 @@
-import requests, os
-
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+import os
+import requests
+from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
+from connect_core.api.log_system import error_print
 
 
 def upload_file(url: str, file_path: str) -> int:
-    with open(file_path, "rb") as file:
-        file_data = file.read()
-        encrypted_data = rsa_encrypt(file_data)
+    """
+    上传文件到指定URL，并在上传前对文件进行RSA加密。
 
-    files = {"file": (os.path.basename(file_path), encrypted_data)}
-    response = requests.post(url, files=files)
+    Args:
+        url (str): 目标服务器的URL。
+        file_path (str): 本地文件的路径。
 
-    if response.status_code == 200:
-        return 200
-    else:
+    Returns:
+        int: HTTP响应状态码，200表示成功，否则返回相应的错误码。
+    """
+    try:
+        with open(file_path, "rb") as file:
+            file_data = file.read()
+            encrypted_data = rsa_encrypt(file_data)
+
+        files = {"file": (os.path.basename(file_path), encrypted_data)}
+        response = requests.post(url, files=files)
+
         return response.status_code
+    except FileNotFoundError:
+        error_print(f"File not found: {file_path}")
+        return 404
+    except Exception as e:
+        error_print(f"An error occurred: {e}")
+        return 500
 
 
 def download_file(url: str, save_path: str) -> int:
-    response = requests.get(url)
+    """
+    从指定URL下载文件，并在保存前对文件进行RSA解密。
 
-    if response.status_code == 200:
-        encrypted_data = response.content
-        try:
-            file_data = rsa_decrypt(encrypted_data)
+    Args:
+        url (str): 文件下载的URL。
+        save_path (str): 下载后保存文件的路径。
 
-            with open(save_path, "wb") as f:
-                f.write(file_data)
-            return 200
-        except Exception:
-            return 400
-    else:
-        return response.status_code
+    Returns:
+        int: HTTP响应状态码，200表示成功，400表示解密错误，否则返回相应的错误码。
+    """
+    try:
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            encrypted_data = response.content
+            try:
+                file_data = rsa_decrypt(encrypted_data)
+
+                with open(save_path, "wb") as file:
+                    file.write(file_data)
+                return 200
+            except Exception as e:
+                error_print(f"Decryption error: {e}")
+                return 400
+        else:
+            return response.status_code
+    except Exception as e:
+        error_print(f"An error occurred: {e}")
+        return 500
