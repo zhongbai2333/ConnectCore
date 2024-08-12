@@ -13,6 +13,7 @@ from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 global websocket_client
 
 
+# Public
 def websocket_client_init() -> None:
     """
     初始化 WebSocket 客户端。
@@ -37,6 +38,17 @@ def get_server_id() -> str:
     return websocket_client.server_id if websocket_client else None
 
 
+def get_server_list() -> list:
+    """
+    获取服务器列表
+
+    Returns:
+        list: 服务器列表
+    """
+    return websocket_client.server_list if websocket_client else None
+
+
+# Private
 def start_cli_server() -> None:
     """
     启动客户端。
@@ -73,6 +85,7 @@ class WebsocketClient:
         self.main_task = None  # 主任务协程
         self.receive_task = None  # 接收任务协程
         self.server_id = None  # 服务器 ID
+        self.server_list = []  # 服务器列表
 
     def start_server(self) -> None:
         """
@@ -193,3 +206,11 @@ class WebsocketClient:
         """
         if msg["s"] == 1:
             self.server_id = msg["id"]
+        elif msg["s"] == 0:
+            if msg["from"] == "-----":
+                if msg["pluginid"] == "system":
+                    data = msg["data"]
+                    if data.key() == "new_server":
+                        self.server_list.append(data["new_server"])
+                    elif data.key() == "disconnect_server":
+                        self.server_list.remove(data["disconnect_server"])

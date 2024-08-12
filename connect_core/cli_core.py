@@ -310,7 +310,7 @@ def start_cli_core():
     cli.start()
 
 
-def restart_cli_core():
+def flush_cli_items():
     """
     重启命令行界面
     """

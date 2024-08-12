@@ -1,6 +1,6 @@
 from connect_core.cli_core import (
     cli_core_init,
-    restart_cli_core,
+    flush_cli_items,
     start_cli_core,
     stop_cli_core,
     add_command,
@@ -11,7 +11,7 @@ from connect_core.cli_core import (
 
 __all__ = [
     "cli_core_init",
-    "restart_cli_core",
+    "flush_cli_items",
     "start_cli_core",
     "stop_cli_core",
     "add_command",

@@ -12,6 +12,7 @@ from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 global websocket_server
 
 
+# Public
 def websocket_server_init() -> None:
     """
     初始化 WebSocket 服务器。
@@ -46,7 +47,8 @@ def send_msg(server_id: str, msg: str) -> None:
     websocket_server.send_msg_to_sub_server(server_id, msg)
 
 
-def flush_completer(server_list: list):
+# Private
+def get_new_completer(server_list: list):
     """
     刷新服务器列表提示词，并更新命令行补全器。
 
@@ -175,14 +177,14 @@ class WebsocketServer:
                         self.broadcast_websockets.add(websocket)
                         self.servers_info[server_id] = msg["data"]
 
-                        from connect_core.cli_core import (
+                        from connect_core.api.cli_command import (
                             set_completer_words,
-                            restart_cli_core,
+                            flush_cli_items,
                         )
 
-                        completer = flush_completer(list(self.websockets.keys()))
+                        completer = get_new_completer(list(self.websockets.keys()))
                         set_completer_words(completer)
-                        restart_cli_core()
+                        flush_cli_items()
 
                         info_print(
                             translate("net_core.service.connect_websocket").format(
@@ -194,6 +196,16 @@ class WebsocketServer:
                         await self.send_msg(
                             websocket,
                             {"s": 1, "id": server_id, "status": "Succeed", "data": {}},
+                        )
+
+                        self.broadcast(
+                            {
+                                "s": 0,
+                                "id": server_id,
+                                "from": "-----",
+                                "pluginid": "system",
+                                "data": {"new_server": server_id},
+                            }, [server_id]
                         )
 
                 except Exception as e:
@@ -226,13 +238,23 @@ class WebsocketServer:
             if websocket in self.broadcast_websockets:
                 self.broadcast_websockets.remove(websocket)
 
-            from connect_core.cli_core import set_completer_words, restart_cli_core
+            from connect_core.api.cli_command import set_completer_words, flush_cli_items
 
-            completer = flush_completer(list(self.websockets.keys()))
+            completer = get_new_completer(list(self.websockets.keys()))
             set_completer_words(completer)
-            restart_cli_core()
+            flush_cli_items()
 
-            flush_completer(list(self.websockets.keys()))
+            get_new_completer(list(self.websockets.keys()))
+
+            self.broadcast(
+                {
+                    "s": 0,
+                    "id": server_id,
+                    "from": "-----",
+                    "pluginid": "system",
+                    "data": {"disconnect_server": server_id},
+                }
+            )
 
             info_print(
                 translate("net_core.service.disconnect_from_sub_websocket").format(
@@ -272,13 +294,15 @@ class WebsocketServer:
         else:
             asyncio.run(self.send_msg(self.websockets[server_id], msg))
 
-    def broadcast(self, msg: dict) -> None:
+    def broadcast(self, msg: dict, server_ids: list = []) -> None:
         """
         广播消息到所有已连接的子服务器。
 
         Args:
             msg (dict): 要广播的消息内容。
+            server_ids (list): 过滤的服务器ID, 默认为 []。
         """
-        websockets.broadcast(
-            self.broadcast_websockets, rsa_encrypt(json.dumps(msg).encode())
-        )
+        websocket_list = self.broadcast_websockets.copy()
+        for i in server_ids:
+            websocket_list.remove(self.websockets[i])
+        websockets.broadcast(websocket_list, rsa_encrypt(json.dumps(msg).encode()))
