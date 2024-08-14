@@ -20,6 +20,8 @@ def main():
     if config_edit.read():
         start_server()
     else:
+        from connect_core.api.tools import restart_program
+
         # 初始化配置
         config_edit.write(initialization_config())
         info_print(
@@ -27,14 +29,6 @@ def main():
         )
         sleep(3)
         restart_program()
-
-
-def restart_program():
-    """
-    重启程序，使用当前的Python解释器重新执行当前脚本。
-    """
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
 
 
 def start_server():
@@ -51,48 +45,10 @@ def start_server():
     # 启动WebSocket客户端
     websocket_client_init()
 
-    from connect_core.api.cli_command import (
-        add_command,
-        start_cli_core,
-        set_completer_words,
-        set_prompt,
-        stop_cli_core,
-    )
+    from connect_core.cli.client.commands import commands_main
 
-    def do_info(args):
-        """
-        显示主服务器信息。
-        """
-        from connect_core.api.websocket.client import get_server_id
+    commands_main()
 
-        info_print("==info==")
-        server_id = get_server_id()
-        if server_id:
-            info_print(f"Main Server Connected! Server ID: {server_id}")
-        else:
-            info_print("Main Server Disconnected!")
-
-    def do_help(args):
-        """
-        显示所有可用命令的帮助信息。
-        """
-        info_print(translate("cli.client_commands.help"))
-
-    def do_exit(args):
-        """
-        退出命令行系统
-        """
-        stop_cli_core()
-
-    add_command("help", do_help)
-    add_command("info", do_info)
-    add_command("exit", do_exit)
-
-    set_completer_words({"info": None, "exit": None, "help": None})
-
-    set_prompt("ConnectCoreClient> ")
-
-    start_cli_core()
 
 def initialization_config() -> dict:
     """

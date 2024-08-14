@@ -210,7 +210,5 @@ class WebsocketClient:
             if msg["from"] == "-----":
                 if msg["pluginid"] == "system":
                     data = msg["data"]
-                    if data.key() == "new_server":
-                        self.server_list.append(data["new_server"])
-                    elif data.key() == "disconnect_server":
-                        self.server_list.remove(data["disconnect_server"])
+                    if "server_list" in data.keys():
+                        self.server_list = data["server_list"]

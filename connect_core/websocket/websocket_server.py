@@ -64,10 +64,11 @@ def get_new_completer(server_list: list):
     server_dict = {server: None for server in server_list}
     server_dict["all"] = None
     completer = {
+        "help": None,
         "list": None,
         "send": {"msg": server_dict, "file": server_dict},
+        "reload": None,
         "exit": None,
-        "help": None,
     }
     return completer
 
@@ -201,11 +202,11 @@ class WebsocketServer:
                         self.broadcast(
                             {
                                 "s": 0,
-                                "id": server_id,
+                                "id": "all",
                                 "from": "-----",
                                 "pluginid": "system",
-                                "data": {"new_server": server_id},
-                            }, [server_id]
+                                "data": {"server_list": list(self.servers_info.keys())},
+                            }
                         )
 
                 except Exception as e:
@@ -249,10 +250,10 @@ class WebsocketServer:
             self.broadcast(
                 {
                     "s": 0,
-                    "id": server_id,
+                    "id": "all",
                     "from": "-----",
                     "pluginid": "system",
-                    "data": {"disconnect_server": server_id},
+                    "data": {"server_list": list(self.servers_info.keys())},
                 }
             )
 

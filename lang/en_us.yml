@@ -20,6 +20,7 @@ connect_core:
       help: "==help==\n
       help: Get help list\n
       info: Get server status\n
+      list: Get the sub-server list\n
       exit: Exit"
   net_core:
     service:

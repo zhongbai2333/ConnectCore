@@ -228,11 +228,12 @@ class CommandLineInterface:
         Args:
             text (str): 用户输入的文本。
         """
-        command = text.split()[0]
-        if command in self.commands:
-            self.commands[command](" ".join(text.split()[1:]))
-        else:
-            self.log_output(f"未知命令: {command}", level="warn")
+        if text:
+            command = text.split()[0]
+            if command in self.commands:
+                self.commands[command](" ".join(text.split()[1:]))
+            else:
+                self.log_output(f"未知命令: {command}", level="warn")
 
     def start(self):
         """
