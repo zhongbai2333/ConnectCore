@@ -3,11 +3,14 @@ import json
 import asyncio
 import random
 import string
+import shutil
+import os
 from mcdreforged.api.all import new_thread
 
 from connect_core.api.log_system import info_print, warn_print, error_print, debug_print
-from connect_core.api.c_t import config, translate, is_mcdr
+from connect_core.api.c_t import config, translate
 from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
+from connect_core.api.tools import is_mcdr, get_file_hash
 
 global websocket_server
 
@@ -46,6 +49,17 @@ def send_msg(server_id: str, msg: str) -> None:
     """
     websocket_server.send_msg_to_sub_server(server_id, msg)
 
+
+def send_file(server_id: str, file_path: str, save_path: str) -> None:
+    """
+    向指定的子服务器发送文件。
+
+    Args:
+        server_id (str): 子服务器的唯一标识符。
+        file_path (str): 要发送的文件目录。
+        save_path (str): 要保存的位置。
+    """
+    websocket_server.send_file_to_sub_server(server_id, file_path, save_path)
 
 # Private
 def get_new_completer(server_list: list):
@@ -209,6 +223,9 @@ class WebsocketServer:
                             }
                         )
 
+                    else:
+                        await self.parse_msg(msg)
+
                 except Exception as e:
                     # 处理解密或消息处理时发生的错误
                     debug_print(f"Error with sub-server connection: {e}")
@@ -295,6 +312,39 @@ class WebsocketServer:
         else:
             asyncio.run(self.send_msg(self.websockets[server_id], msg))
 
+    def send_file_to_sub_server(self, server_id: str, file_path: str, save_path: str) -> None:
+        """
+        发送文件到指定的子服务器。
+
+        Args:
+            server_id (str): 子服务器的唯一标识符。
+            file_path (str): 要发送的文件目录。
+            save_path (str): 要保存的位置。
+        """
+        try:
+            # 复制文件
+            shutil.copy(file_path, "./send_files/")
+            file_hash = get_file_hash(file_path)
+            msg = {
+                "s": 0,
+                "id": server_id,
+                "from": "-----",
+                "pluginid": "system",
+                "data": {
+                    "file": {
+                        "path": f"http://{config('ip')}:{config('http_port')}/send_files/{os.path.basename(file_path)}",
+                        "hash": file_hash,
+                        "save_path": save_path,
+                    }
+                },
+            }
+            if server_id == "all":
+                self.broadcast(msg)
+            else:
+                asyncio.run(self.send_msg(self.websockets[server_id], msg))
+        except (IOError, OSError) as e:
+            error_print(f"Copy Error: {e}")
+
     def broadcast(self, msg: dict, server_ids: list = []) -> None:
         """
         广播消息到所有已连接的子服务器。
@@ -307,3 +357,42 @@ class WebsocketServer:
         for i in server_ids:
             websocket_list.remove(self.websockets[i])
         websockets.broadcast(websocket_list, rsa_encrypt(json.dumps(msg).encode()))
+
+    async def parse_msg(self, msg: dict):
+        """
+        解析并处理从子服务器接收到的消息。
+
+        Args:
+            msg (dict): 从服务器接收到的消息内容。
+        """
+        if msg["s"] == 0:
+            if "msg" in msg["data"].keys():
+                if msg["id"] == "-----":
+                    if is_mcdr():
+                        pass # TODO
+                    else:
+                        info_print(msg["data"]["msg"])
+                elif msg["id"] == "all":
+                    msg = {
+                        "s": 0,
+                        "id": msg["id"],
+                        "from": msg["from"],
+                        "pluginid": msg["pluginid"],
+                        "data": msg["data"],
+                    }
+                    self.broadcast(msg, [msg["from"]])
+                    if is_mcdr():
+                        pass # TODO
+                    else:
+                        info_print(msg["data"]["msg"])
+                else:
+                    msg = {
+                        "s": 0,
+                        "id": msg["id"],
+                        "from": msg["from"],
+                        "pluginid": msg["pluginid"],
+                        "data": msg["data"],
+                    }
+                    await self.send_msg(self.websockets[msg["id"]], msg)
+            if "file" in msg["data"].keys():
+                pass # TODO

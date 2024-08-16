@@ -1,4 +1,3 @@
-import os, sys
 from time import sleep
 from connect_core.api.log_system import info_print
 from connect_core.api.c_t import config, translate

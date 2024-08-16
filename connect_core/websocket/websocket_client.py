@@ -2,13 +2,15 @@ import websockets
 import json
 import asyncio
 import threading
-import sys
+import sys, os
 from time import sleep
 from mcdreforged.api.all import new_thread
 
 from connect_core.api.log_system import info_print, warn_print, error_print, debug_print
-from connect_core.api.c_t import config, translate, is_mcdr
+from connect_core.api.c_t import config, translate
 from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
+from connect_core.api.tools import is_mcdr, verify_file_hash
+from connect_core.api.http import download_file
 
 global websocket_client
 
@@ -48,7 +50,45 @@ def get_server_list() -> list:
     return websocket_client.server_list if websocket_client else None
 
 
+def send_msg(server_id: str, msg: str) -> None:
+    """
+    向指定的子服务器发送消息。
+
+    Args:
+        server_id (str): 子服务器的唯一标识符。
+        msg (str): 要发送的消息内容。
+    """
+    websocket_client.send_msg_to_other_server(server_id, msg)
+
+
 # Private
+def get_new_completer(server_list: list):
+    """
+    刷新服务器列表提示词，并更新命令行补全器。
+
+    Args:
+        server_list (list): 服务器列表
+
+    Returns:
+        completer (dict): 重制后的提示词
+    """
+    if is_mcdr():
+        return None
+
+    server_dict = {server: None for server in server_list}
+    server_dict["all"] = None
+    server_dict["-----"] = None
+    completer = {
+        "help": None,
+        "info": None,
+        "list": None,
+        "send": {"msg": server_dict, "file": server_dict},
+        "reload": None,
+        "exit": None,
+    }
+    return completer
+
+
 def start_cli_server() -> None:
     """
     启动客户端。
@@ -151,7 +191,7 @@ class WebsocketClient:
                     recv_data = rsa_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
                     debug_print(f"Received data from main server: {recv_data}")
-                    self.parse_message(recv_data)
+                    await self.parse_message(recv_data)
                 else:
                     break
             except asyncio.CancelledError:
@@ -180,6 +220,7 @@ class WebsocketClient:
                     info_print(
                         translate("net_core.service.disconnect_websocket") + str(e)
                     )
+                    os.system(f"title ConnectCore Client")
                     websocket_client_init()
                     return
                 else:
@@ -196,7 +237,24 @@ class WebsocketClient:
         """
         await self.websocket.send(rsa_encrypt(json.dumps(msg).encode()))
 
-    def parse_message(self, msg: dict) -> None:
+    def send_msg_to_other_server(self, to_server_id: str, msg: str) -> None:
+        """
+        发送消息到指定的子服务器。
+
+        Args:
+            server_id (str): 子服务器的唯一标识符。
+            msg (str): 要发送的消息内容。
+        """
+        msg = {
+            "s": 0,
+            "id": to_server_id,
+            "from": self.server_id,
+            "pluginid": "system",
+            "data": {"msg": msg},
+        }
+        asyncio.run(self.send_msg(msg))
+
+    async def parse_message(self, msg: dict) -> None:
         """
         解析并处理从服务器接收到的消息。
         如果消息中包含服务器 ID，则更新客户端的服务器 ID。
@@ -205,10 +263,44 @@ class WebsocketClient:
             msg (dict): 从服务器接收到的消息内容。
         """
         if msg["s"] == 1:
+            os.system(f"title ConnectCore Client {msg["id"]}")
             self.server_id = msg["id"]
         elif msg["s"] == 0:
-            if msg["from"] == "-----":
-                if msg["pluginid"] == "system":
-                    data = msg["data"]
-                    if "server_list" in data.keys():
-                        self.server_list = data["server_list"]
+            if msg["pluginid"] == "system":
+                data = msg["data"]
+                if "server_list" in data.keys():
+                    self.server_list = data["server_list"]
+
+                    from connect_core.api.cli_command import (
+                        set_completer_words,
+                        flush_cli_items,
+                    )
+
+                    new_server_list = self.server_list.copy()
+                    new_server_list.remove(self.server_id)
+
+                    completer = get_new_completer(new_server_list)
+                    set_completer_words(completer)
+                    flush_cli_items()
+                if "msg" in data.keys():
+                    if is_mcdr():
+                        pass # TODO
+                    else:
+                        info_print(data["msg"])
+                if "file" in data.keys():
+                    data = data["file"]
+                    download_file(data["path"], data["save_path"])
+                    while not verify_file_hash(data["save_path"], data["hash"]):
+                        download_file(data["path"], data["save_path"])
+                    msg = {
+                        "s": 0,
+                        "id": "-----",
+                        "from": self.server_id,
+                        "pluginid": "system",
+                        "data": {
+                            "file": {
+                                "hash": data["hash"]
+                            }
+                        },
+                    }
+                    await self.send_msg(msg)

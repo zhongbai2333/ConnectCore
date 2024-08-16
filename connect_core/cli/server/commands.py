@@ -5,10 +5,12 @@ from connect_core.api.cli_command import (
     set_prompt,
     stop_cli_core,
 )
-from connect_core.api.websocket.server import get_servers_info, send_msg
+from connect_core.api.websocket.server import get_servers_info, send_msg, send_file
 from connect_core.api.log_system import info_print
 from connect_core.api.c_t import translate
-from connect_core.api.tools import restart_program
+from connect_core.api.tools import restart_program, check_file_exists, append_to_path
+import os
+
 
 # 启动核心命令行程序
 def do_list(args):
@@ -20,25 +22,36 @@ def do_list(args):
     for num, key in enumerate(server_list.keys()):
         info_print(f"{num + 1}. {key}: {server_list[key]['path']}")
 
+
 def do_send(args):
     """
     向指定服务器发送消息或文件。
     """
 
     commands = args.split()
-    if len(commands) != 3:
+    if len(commands) < 3:
         info_print(translate("cli.server_commands.send"))
         return None
 
-    server_name, content = commands[1], commands[2]
+    server_name, content, save_path = commands[1], commands[2], commands[3]
     if commands[0] == "msg" and (
         server_name == "all" or server_name in get_servers_info()
     ):
         send_msg(server_name, content)
-    elif commands[0] == "file":
-        pass  # Implement file sending logic here
+    elif commands[0] == "file" and (
+        server_name == "all" or server_name in get_servers_info()
+    ) and len(commands) == 4:
+        if check_file_exists(content):
+            send_file(
+                server_name,
+                content,
+                append_to_path(save_path, os.path.basename(content)),
+            )
+        else:
+            info_print(translate("cli.server_commands.no_file"))
     else:
         info_print(translate("cli.server_commands.send"))
+
 
 def do_help(args):
     """
@@ -46,17 +59,20 @@ def do_help(args):
     """
     info_print(translate("cli.server_commands.help"))
 
+
 def do_reload(args):
     """
     重载程序和插件
     """
     restart_program()
 
+
 def do_exit(args):
     """
     退出命令行系统
     """
     stop_cli_core()
+
 
 def commands_main():
     """
@@ -79,5 +95,7 @@ def commands_main():
     )
 
     set_prompt("ConnectCoreServer> ")
+
+    os.system(f"title ConnectCore Server")
 
     start_cli_core()

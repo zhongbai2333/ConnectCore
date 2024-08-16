@@ -350,7 +350,7 @@ def error_print(msg):
 
 def debug_print(msg):
     """
-    输出ERROR级别的日志信息。
+    输出DEBUG级别的日志信息。
 
     Args:
         msg (str): 日志消息内容。
