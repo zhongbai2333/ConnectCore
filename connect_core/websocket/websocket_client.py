@@ -292,7 +292,7 @@ class WebsocketClient:
                     download_file(data["path"], data["save_path"])
                     while not verify_file_hash(data["save_path"], data["hash"]):
                         download_file(data["path"], data["save_path"])
-                    msg = {
+                    wait_send_msg = {
                         "s": 0,
                         "id": "-----",
                         "from": self.server_id,
@@ -303,4 +303,5 @@ class WebsocketClient:
                             }
                         },
                     }
-                    await self.send_msg(msg)
+                    await self.send_msg(wait_send_msg)
+                    info_print(translate("net_core.service.file_download_finish_from_other").format(data["from"]))

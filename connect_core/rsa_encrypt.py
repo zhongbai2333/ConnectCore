@@ -17,7 +17,6 @@ def rsa_main():
         fernet = Fernet(password.encode())
     else:
         fernet = None
-        debug_print(translate("rsa.no_password_provided"))
 
 
 def rsa_encrypt(data: bytes) -> bytes:

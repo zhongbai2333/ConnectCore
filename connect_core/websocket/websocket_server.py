@@ -113,6 +113,7 @@ class WebsocketServer:
         self.websockets = {}  # 存储已连接的 WebSocket 客户端
         self.broadcast_websockets = set()  # 需要广播消息的 WebSocket 客户端集合
         self.servers_info = {}  # 存储已连接的子服务器的信息
+        self.wait_flie_list = {}  # 存储等待下载的文件信息
 
     def start_server(self) -> None:
         """
@@ -339,8 +340,16 @@ class WebsocketServer:
                 },
             }
             if server_id == "all":
+                self.wait_flie_list[file_hash] = [
+                    f"./send_files/{os.path.basename(file_path)}",
+                    list(self.servers_info.keys()),
+                ]
                 self.broadcast(msg)
             else:
+                self.wait_flie_list[file_hash] = [
+                    f"./send_files/{os.path.basename(file_path)}",
+                    [server_id],
+                ]
                 asyncio.run(self.send_msg(self.websockets[server_id], msg))
         except (IOError, OSError) as e:
             error_print(f"Copy Error: {e}")
@@ -395,4 +404,9 @@ class WebsocketServer:
                     }
                     await self.send_msg(self.websockets[msg["id"]], msg)
             if "file" in msg["data"].keys():
-                pass # TODO
+                file_hash = msg["data"]["file"]["hash"]
+                self.wait_flie_list[file_hash][1].remove(msg["from"])
+                if not self.wait_flie_list[file_hash][1]:
+                    os.remove(self.wait_flie_list[file_hash][0])
+                    del self.wait_flie_list[file_hash]
+                    info_print(translate("net_core.service.sub_server_download_finish").format(msg["from"]))
