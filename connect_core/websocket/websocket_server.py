@@ -44,27 +44,30 @@ def get_servers_info() -> dict:
     return websocket_server.servers_info if websocket_server else {}
 
 
-def send_msg(server_id: str, msg: str) -> None:
+def send_data(pluginid: str, server_id: str, data: str) -> None:
     """
     向指定的子服务器发送消息。
 
     Args:
+        pluginid (str): 插件的唯一标识符
         server_id (str): 子服务器的唯一标识符。
-        msg (str): 要发送的消息内容。
+        data (str): 要发送的数据。
     """
-    websocket_server.send_msg_to_sub_server(server_id, msg)
+    websocket_server.send_data_to_sub_server(pluginid, server_id, data)
 
 
-def send_file(server_id: str, file_path: str, save_path: str) -> None:
+def send_file(pluginid: str, server_id: str, file_path: str, save_path: str) -> None:
     """
     向指定的子服务器发送文件。
 
     Args:
+        pluginid (str): 插件的唯一标识符
         server_id (str): 子服务器的唯一标识符。
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    websocket_server.send_file_to_sub_server(server_id, file_path, save_path)
+    websocket_server.send_file_to_sub_server(pluginid, server_id, file_path, save_path)
+
 
 # Private
 def get_new_completer(server_list: list):
@@ -304,31 +307,33 @@ class WebsocketServer:
         """
         await websocket.send(rsa_encrypt(json.dumps(msg).encode()))
 
-    def send_msg_to_sub_server(self, server_id: str, msg: str) -> None:
+    def send_data_to_sub_server(self, pluginid: str, server_id: str, data: dict) -> None:
         """
         发送消息到指定的子服务器。
 
         Args:
+            pluginid (str): 插件的唯一标识符
             server_id (str): 子服务器的唯一标识符。
-            msg (str): 要发送的消息内容。
+            data (dict): 要发送的数据。
         """
         msg = {
             "s": 0,
             "id": server_id,
             "from": "-----",
-            "pluginid": "system",
-            "data": {"msg": msg},
+            "pluginid": pluginid,
+            "data": data,
         }
         if server_id == "all":
             self.broadcast(msg)
         else:
             asyncio.run(self.send_msg(self.websockets[server_id], msg))
 
-    def send_file_to_sub_server(self, server_id: str, file_path: str, save_path: str) -> None:
+    def send_file_to_sub_server(self, pluginid: str, server_id: str, file_path: str, save_path: str) -> None:
         """
         发送文件到指定的子服务器。
 
         Args:
+            pluginid (str): 插件的唯一标识符
             server_id (str): 子服务器的唯一标识符。
             file_path (str): 要发送的文件目录。
             save_path (str): 要保存的位置。
@@ -342,7 +347,7 @@ class WebsocketServer:
                 "s": 0,
                 "id": server_id,
                 "from": "-----",
-                "pluginid": "system",
+                "pluginid": pluginid,
                 "data": {
                     "file": {
                         "path": f"http://{config['ip']}:{config['http_port']}/send_files/{os.path.basename(file_path)}",

@@ -55,27 +55,29 @@ def get_server_list() -> list:
     return websocket_client.server_list if websocket_client else None
 
 
-def send_msg(server_id: str, msg: str) -> None:
+def send_data(pluginid: str, server_id: str, data: str) -> None:
     """
     向指定的子服务器发送消息。
 
     Args:
+        pluginid (str): 插件的唯一标识符
         server_id (str): 子服务器的唯一标识符。
         msg (str): 要发送的消息内容。
     """
-    websocket_client.send_msg_to_other_server(server_id, msg)
+    websocket_client.send_data_to_other_server(pluginid, server_id, data)
 
 
-def send_file(server_id: str, file_path: str, save_path: str) -> None:
+def send_file(pluginid: str, server_id: str, file_path: str, save_path: str) -> None:
     """
     向指定的子服务器发送文件。
 
     Args:
+        pluginid (str): 插件的唯一标识符
         server_id (str): 子服务器的唯一标识符。
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    websocket_client.send_file_to_sub_server(server_id, file_path, save_path)
+    websocket_client.send_file_to_sub_server(pluginid, server_id, file_path, save_path)
 
 
 # Private
@@ -255,11 +257,12 @@ class WebsocketClient:
         """
         await self.websocket.send(rsa_encrypt(json.dumps(msg).encode()))
 
-    def send_msg_to_other_server(self, to_server_id: str, msg: str) -> None:
+    def send_data_to_other_server(self, pluginid: str, to_server_id: str, data: str) -> None:
         """
         发送消息到指定的子服务器。
 
         Args:
+            pluginid (str): 插件的唯一标识符
             server_id (str): 子服务器的唯一标识符。
             msg (str): 要发送的消息内容。
         """
@@ -267,10 +270,22 @@ class WebsocketClient:
             "s": 0,
             "id": to_server_id,
             "from": self.server_id,
-            "pluginid": "system",
-            "data": {"msg": msg},
+            "pluginid": pluginid,
+            "data": data,
         }
         asyncio.run(self.send_msg(msg))
+    
+    def send_file_to_sub_server(self, pluginid: str, file_path: str, save_path: str):
+        """
+        发送文件到指定的子服务器。
+
+        Args:
+            pluginid (str): 插件的唯一标识符
+            server_id (str): 子服务器的唯一标识符。
+            file_path (str): 要发送的文件目录。
+            save_path (str): 要保存的位置。
+        """
+        pass
 
     async def parse_message(self, msg: dict) -> None:
         """
@@ -319,4 +334,4 @@ class WebsocketClient:
                         },
                     }
                     await self.send_msg(wait_send_msg)
-                    _connect_interface.info(_connect_interface.tr("net_core.service.file_download_finish_from_other").format(msg["from"]))
+                    _connect_interface.info(_connect_interface.tr("net_core.service.file_download_finish_from_other").format(msg["from"], data["save_path"]))

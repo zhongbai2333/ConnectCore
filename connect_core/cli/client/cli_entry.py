@@ -16,7 +16,7 @@ def cli_main():
 
     global connect_interface, config
 
-    connect_interface = ConnectCoreServerInterface()
+    connect_interface = ConnectCoreServerInterface(is_server=False)
     config_edit = JsonDataEditor()
     config = connect_interface.get_config()
     connect_interface.info("\nConnectCore Client Starting...")

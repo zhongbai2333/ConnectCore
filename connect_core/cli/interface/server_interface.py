@@ -6,18 +6,24 @@ from mcdreforged.api.all import PluginServerInterface
 ####################
 class ConnectCoreServerInterface:
     def __init__(
-        self, pluginid: str = "system", mcdr_core: PluginServerInterface = None
+        self,
+        pluginid: str = "system",
+        is_server: bool = True,
+        mcdr_core: PluginServerInterface = None,
     ):
         """
         ConnectCore 的主 API 控制器
 
         Args:
             pluginid (str): 插件的ID
+            is_server (bool): 是否为服务器
             mcdr_core (PluginServerInterface): MCDR 插件控制器, 默认为 None
         """
         from connect_core.cli import LogSystem
+
         self.pluginid = pluginid
         self.mcdr_core = mcdr_core
+        self.is_server = is_server
         self.language = (
             self.get_config()["language"]
             if "language" in self.get_config().keys()
@@ -80,9 +86,7 @@ class ConnectCoreServerInterface:
         else:
             key_n = "connect_core." + key
             key_n = key_n.split(".")
-            return self._get_nested_value(
-                YmlLanguage(self.language).translate, key_n
-            )
+            return self._get_nested_value(YmlLanguage(self.language).translate, key_n)
 
     def tr(self, key: str):
         """
@@ -133,6 +137,49 @@ class ConnectCoreServerInterface:
             msg (any): 日志消息内容。
         """
         self.log_system.debug(str(msg))
+
+    def send_data(self, server_id: str, data: dict):
+        """
+        向指定的服务器发送消息。
+
+        Args:
+            server_id (str): 子服务器的唯一标识符。
+            data (str): 要发送的数据。
+        """
+        if self.is_server:
+            from connect_core.websocket.websocket_server import (
+                send_data as server_send_data,
+            )
+
+            server_send_data(self.pluginid, server_id, data)
+        else:
+            from connect_core.websocket.websocket_client import (
+                send_data as client_send_data,
+            )
+
+            client_send_data(self.pluginid, server_id, data)
+
+    def send_file(self, server_id: str, file_path: str, save_path: str = None):
+        """
+        向指定的服务器发送文件。
+
+        Args:
+            server_id (str): 子服务器的唯一标识符。
+            file_path (str): 要发送的文件目录。
+            save_path (str): 要保存的位置。
+        """
+        if self.is_server:
+            from connect_core.websocket.websocket_server import (
+                send_file as server_send_file,
+            )
+
+            server_send_file(self.pluginid, server_id, file_path, save_path)
+        else:
+            from connect_core.websocket.websocket_client import (
+                send_file as client_send_file,
+            )
+
+            client_send_file(self.pluginid, server_id, file_path, save_path)
 
     def _get_nested_value(self, data, keys_path, default=None):
         for key in keys_path:

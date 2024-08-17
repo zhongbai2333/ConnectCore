@@ -1,5 +1,5 @@
 from connect_core.api.command_interface import CommandLineInterface
-from connect_core.api.websocket.client import get_server_id, get_server_list, send_msg
+from connect_core.api.websocket.client import get_server_id, get_server_list
 from connect_core.api.tools import restart_program, check_file_exists, append_to_path
 import os
 from typing import TYPE_CHECKING
@@ -48,7 +48,7 @@ def do_send(args):
         or server_name == "-----"
         or server_name in get_server_list()
     ):
-        send_msg(server_name, content)
+        _connect_interface.send_data(server_name, {"msg": content})
     elif (
         commands[0] == "file"
         and (
@@ -60,7 +60,7 @@ def do_send(args):
     ):
         if check_file_exists(content):
             save_path = commands[3]
-            send_file(
+            _connect_interface.send_file(
                 server_name,
                 content,
                 append_to_path(save_path, os.path.basename(content)),
