@@ -1,20 +1,26 @@
 import threading
 from time import sleep
-from connect_core.api.log_system import info_print
-from connect_core.api.c_t import config, translate
+from connect_core.api.server_interface import ConnectCoreServerInterface
 
-global translate_temp
+global translate_temp, connect_interface, config
 
 
-def main():
+####################
+# Public
+####################
+def cli_main():
     """
     程序主入口。
     检查是否为第一次启动，决定初始化配置或直接启动服务器。
     """
     from connect_core.cli.storage import JsonDataEditor
 
+    global connect_interface, config
+
+    connect_interface = ConnectCoreServerInterface()
     config_edit = JsonDataEditor()
-    info_print("\nConnectCore Server Starting...")
+    config = connect_interface.get_config()
+    connect_interface.info("\nConnectCore Server Starting...")
 
     # 判断是否是第一次启动
     if config_edit.read():
@@ -24,29 +30,38 @@ def main():
 
         # 初始化配置
         config_edit.write(initialization_config())
-        info_print(
+        connect_interface.info(
             translate_temp["connect_core"]["cli"]["initialization_config"]["finish"]
         )
         sleep(3)
         restart_program()
 
 
+####################
+# Private
+####################
 def start_server():
     """
     启动服务器并初始化核心命令行程序。
     """
-    info_print(
-        translate("cli.starting.welcome").format(f"{config('ip')}:{config('port')}")
+    connect_interface.info(
+        connect_interface.tr("cli.starting.welcome").format(
+            f"{config['ip']}:{config['port']}"
+        )
     )
-    info_print(translate("cli.starting.welcome_password").format(config("password")))
+    connect_interface.info(
+        connect_interface.tr("cli.starting.welcome_password").format(config["password"])
+    )
 
     # 启动服务器线程
     start_servers_thread = threading.Thread(target=start_servers)
     start_servers_thread.start()
 
     from connect_core.cli.server.commands import commands_main
+    from connect_core.api.rsa import rsa_main
 
-    commands_main()
+    rsa_main(connect_interface)
+    commands_main(connect_interface)
 
 
 def start_servers():
@@ -59,11 +74,13 @@ def start_servers():
     sleep(0.3)
 
     # 创建并启动HTTP服务器线程
-    http_server_thread = threading.Thread(target=http_main)
+    http_server_thread = threading.Thread(target=http_main, args=(connect_interface,))
     http_server_thread.daemon = True
 
     # 创建并启动WebSocket服务器线程
-    websocket_server_thread = threading.Thread(target=websocket_server_init)
+    websocket_server_thread = threading.Thread(
+        target=websocket_server_init, args=(connect_interface,)
+    )
     websocket_server_thread.daemon = True
 
     http_server_thread.start()

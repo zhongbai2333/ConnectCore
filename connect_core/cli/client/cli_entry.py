@@ -1,19 +1,25 @@
 from time import sleep
-from connect_core.api.log_system import info_print
-from connect_core.api.c_t import config, translate
+from connect_core.api.server_interface import ConnectCoreServerInterface
 
-global translate_temp
+global translate_temp, connect_interface, config
 
 
-def main():
+####################
+# Public
+####################
+def cli_main():
     """
     程序主入口。
     检查是否为第一次启动，决定初始化配置或直接启动客户端。
     """
     from connect_core.cli.storage import JsonDataEditor
 
+    global connect_interface, config
+
+    connect_interface = ConnectCoreServerInterface()
     config_edit = JsonDataEditor()
-    info_print("\nConnectCore Client Starting...")
+    config = connect_interface.get_config()
+    connect_interface.info("\nConnectCore Client Starting...")
 
     # 判断是否是第一次启动
     if config_edit.read():
@@ -23,30 +29,39 @@ def main():
 
         # 初始化配置
         config_edit.write(initialization_config())
-        info_print(
+        connect_interface.info(
             translate_temp["connect_core"]["cli"]["initialization_config"]["finish"]
         )
         sleep(3)
         restart_program()
 
 
+####################
+# Private
+####################
 def start_server():
     """
     启动WebSocket客户端并初始化核心命令行程序。
     """
     from connect_core.api.websocket.client import websocket_client_init
 
-    info_print(
-        translate("cli.starting.welcome").format(f"{config('ip')}:{config('port')}")
+    connect_interface.info(
+        connect_interface.tr("cli.starting.welcome").format(
+            f"{config['ip']}:{config['port']}"
+        )
     )
-    info_print(translate("cli.starting.welcome_password").format(config("password")))
+    connect_interface.info(
+        connect_interface.tr("cli.starting.welcome_password").format(config["password"])
+    )
 
     # 启动WebSocket客户端
-    websocket_client_init()
+    websocket_client_init(connect_interface)
 
     from connect_core.cli.client.commands import commands_main
+    from connect_core.api.rsa import rsa_main
 
-    commands_main()
+    rsa_main(connect_interface)
+    commands_main(connect_interface)
 
 
 def initialization_config() -> dict:

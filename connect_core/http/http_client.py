@@ -1,10 +1,13 @@
 import os
 import requests
 from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
-from connect_core.api.log_system import error_print
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from connect_core.api.server_interface import ConnectCoreServerInterface
 
 
-def upload_file(url: str, file_path: str) -> int:
+def upload_file(connect_interface: 'ConnectCoreServerInterface', url: str, file_path: str) -> int:
     """
     上传文件到指定URL，并在上传前对文件进行RSA加密。
 
@@ -25,14 +28,14 @@ def upload_file(url: str, file_path: str) -> int:
 
         return response.status_code
     except FileNotFoundError:
-        error_print(f"File not found: {file_path}")
+        connect_interface.error(f"File not found: {file_path}")
         return 404
     except Exception as e:
-        error_print(f"An error occurred: {e}")
+        connect_interface.error(f"An error occurred: {e}")
         return 500
 
 
-def download_file(url: str, save_path: str) -> int:
+def download_file(connect_interface: 'ConnectCoreServerInterface', url: str, save_path: str) -> int:
     """
     从指定URL下载文件，并在保存前对文件进行RSA解密。
 
@@ -55,10 +58,10 @@ def download_file(url: str, save_path: str) -> int:
                     file.write(file_data)
                 return 200
             except Exception as e:
-                error_print(f"Decryption error: {e}")
+                connect_interface.error(f"Decryption error: {e}")
                 return 400
         else:
             return response.status_code
     except Exception as e:
-        error_print(f"An error occurred: {e}")
+        connect_interface.error(f"An error occurred: {e}")
         return 500

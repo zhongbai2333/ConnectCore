@@ -1,37 +1,56 @@
 import sys
 
 
+####################
+# Private
+####################
 def start_server_cli():
-    from connect_core.cli.server.cli_entry import main
+    from connect_core.cli.server import cli_main
 
-    main()
+    cli_main()
 
 
 def start_client_cli():
-    from connect_core.cli.client.cli_entry import main
+    from connect_core.cli.client import cli_main
 
-    main()
+    cli_main()
 
 
-# First Start Point
-if __name__ == "__main__":
-    from connect_core.api.log_system import info_print
-    from connect_core.module_initialization import module_initialization_main
+def display_help():
+    """
+    显示CLI系统帮助
 
-    # 初始化
-    module_initialization_main()
+    Returns:
+        None
+    """
+    print("Connect Core Help Assistant")
+    print("    client: Start Client")
+    print("    server: Start Server")
 
+
+def main():
+    """
+    CLI程序入口
+
+    Returns:
+        None
+    """
     # 根据启动命令控制
     if len(sys.argv) > 1:
-        if sys.argv[1] == "server":
+        command = sys.argv[1]
+        if command == "server":
             start_server_cli()
-        elif sys.argv[1] == "client":
+        elif command == "client":
             start_client_cli()
         else:
-            info_print("Connect Core Help Assistant")
-            info_print("    client: Start Client")
-            info_print("    server: Start Server")
+            display_help()
     else:
-        info_print("Connect Core Help Assistant")
-        info_print("    client: Start Client")
-        info_print("    server: Start Server")
+        display_help()
+
+
+####################
+# Public
+####################
+# First Start Point
+if __name__ == "__main__":
+    main()

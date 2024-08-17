@@ -3,13 +3,15 @@ from socketserver import ThreadingMixIn
 import os
 from urllib.parse import urlparse
 import cgi
+from typing import TYPE_CHECKING
 
-from connect_core.api.c_t import translate, config
-from connect_core.api.log_system import info_print
+if TYPE_CHECKING:
+    from connect_core.api.server_interface import ConnectCoreServerInterface
+
 from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
 
 
-def http_main():
+def http_main(connect_interface: 'ConnectCoreServerInterface'):
     class ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
 
@@ -92,18 +94,18 @@ def http_main():
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(b"Invalid Content-Type")
-        
-        def log_message(self, format, *args):
-            info_print(f"[HTTP] [{self.address_string()}] {format % args}")
 
+        def log_message(self, format, *args):
+            connect_interface.info(f"[HTTP] [{self.address_string()}] {format % args}")
 
     def run(server_class=ThreadingHTTPServer, handler_class=SimpleHTTPRequestHandler):
-        server_address = (config("ip"), config("http_port"))
+        config = connect_interface.get_config()
+        server_address = (config["ip"], config["http_port"])
         httpd = server_class(server_address, handler_class)
         if not os.path.exists("send_files/"):
             os.makedirs("send_files/")
-        info_print(
-            translate("net_core.service.start_http").format(
+        connect_interface.info(
+            connect_interface.tr("net_core.service.start_http").format(
                 f"{server_address[0]}:{server_address[1]}"
             )
         )
