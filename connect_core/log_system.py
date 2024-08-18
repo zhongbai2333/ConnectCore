@@ -3,16 +3,14 @@ import time
 import html
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit import print_formatted_text
-from mcdreforged.api.all import PluginServerInterface
 
 
 # 日志系统类
 class LogSystem:
     def __init__(
         self,
-        pluginid: str = "system",
+        sid: str,
         debug: bool = False,
-        mcdr_core: PluginServerInterface = None,
         filelog: str = None,
         path: str = "logs/",
     ) -> None:
@@ -20,19 +18,19 @@ class LogSystem:
         初始化日志系统，创建日志文件夹和文件。
 
         Args:
-            pluginid (str): 插件ID, 默认为 system
+            sid (str): 插件ID
             debug (bool): 是否启用debug, 默认为 False
-            mcdr_core (PluginServerInterface): MCDR核心接口, 用于集成日志系统。
             filelog (str): 日志文件的名称。
             path (str): 日志文件的存储路径。
         """
+        from connect_core.mcdr.mcdr_entry import get_mcdr
         if not os.path.exists(path):
             os.makedirs(path)
         if not filelog:
             filelog = f"Log-{time.strftime('%b_%d-%H_%M_%S', time.localtime())}.log"
         self.logfile = os.path.join(path, filelog)
-        self.mcdr_core = mcdr_core
-        self.pluginid = pluginid
+        self.mcdr_core = get_mcdr()
+        self.sid = sid
         self.debug_mode = debug
 
     def _log(self, level: str, msg: str) -> None:
@@ -49,10 +47,10 @@ class LogSystem:
             # 使用 html.escape 转义日志消息中的特殊字符
             escaped_msg = html.escape(msg)
             formatted_message = (
-                f"[{timestamp}] {colored_level} [{self.pluginid}] {escaped_msg}"
+                f"[{timestamp}] {colored_level} [{self.sid}] {escaped_msg}"
             )
             print_formatted_text(HTML(formatted_message))
-            file.write(f"[{timestamp}] [{level}] [{self.pluginid}] {msg}\n")
+            file.write(f"[{timestamp}] [{level}] [{self.sid}] {msg}\n")
 
     def info(self, *msg) -> None:
         """

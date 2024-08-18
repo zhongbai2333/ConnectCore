@@ -6,12 +6,12 @@ import cgi
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.server_interface import ConnectCoreServerInterface
+    from connect_core.interface.contol_interface import ControlInterface
 
-from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
+from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
 
-def http_main(connect_interface: 'ConnectCoreServerInterface'):
+def http_main(control_interface: "ControlInterface"):
     class ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
 
@@ -96,16 +96,16 @@ def http_main(connect_interface: 'ConnectCoreServerInterface'):
                 self.wfile.write(b"Invalid Content-Type")
 
         def log_message(self, format, *args):
-            connect_interface.info(f"[HTTP] [{self.address_string()}] {format % args}")
+            control_interface.info(f"[HTTP] [{self.address_string()}] {format % args}")
 
     def run(server_class=ThreadingHTTPServer, handler_class=SimpleHTTPRequestHandler):
-        config = connect_interface.get_config()
+        config = control_interface.get_config()
         server_address = (config["ip"], config["http_port"])
         httpd = server_class(server_address, handler_class)
         if not os.path.exists("send_files/"):
             os.makedirs("send_files/")
-        connect_interface.info(
-            connect_interface.tr("net_core.service.start_http").format(
+        control_interface.info(
+            control_interface.tr("net_core.service.start_http").format(
                 f"{server_address[0]}:{server_address[1]}"
             )
         )

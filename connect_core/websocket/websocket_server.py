@@ -9,24 +9,26 @@ from mcdreforged.api.all import new_thread
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.server_interface import ConnectCoreServerInterface
+    from connect_core.interface.contol_interface import ControlInterface
 
-from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
-from connect_core.api.tools import get_file_hash
+from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.cli.tools import get_file_hash
+from connect_core.mcdr.mcdr_entry import get_mcdr
 
-global websocket_server, _connect_interface
+websocket_server = None
+global _control_interface
 
 
 # Public
-def websocket_server_init(connect_interface: 'ConnectCoreServerInterface') -> None:
+def websocket_server_init(control_interface: "ControlInterface") -> None:
     """
     初始化 WebSocket 服务器。
     根据环境选择启动 MCDR 多线程服务器或普通服务器。
     """
-    global _connect_interface
+    global _control_interface
 
-    _connect_interface = connect_interface
-    if connect_interface.is_mcdr():
+    _control_interface = control_interface
+    if get_mcdr():
         start_mcdr_server()
     else:
         global websocket_server
@@ -80,7 +82,7 @@ def get_new_completer(server_list: list):
     Returns:
         completer (dict): 重制后的提示词
     """
-    if _connect_interface.is_mcdr():
+    if get_mcdr():
         return None
 
     server_dict = {server: None for server in server_list}
@@ -115,7 +117,7 @@ class WebsocketServer:
         """
         初始化 WebSocket 服务器的基本配置。
         """
-        config = _connect_interface.get_config()
+        config = _control_interface.get_config()
         self.finish_close = False
         self.host = config["ip"]  # 服务器监听的 IP 地址
         self.port = config["port"]  # 服务器监听的端口号
@@ -164,8 +166,8 @@ class WebsocketServer:
         try:
             await self.main_task
         except asyncio.CancelledError:
-            _connect_interface.info(
-                _connect_interface.tr("net_core.service.stop_websocket")
+            _control_interface.info(
+                _control_interface.tr("net_core.service.stop_websocket")
             )
             self.finish_close = True
 
@@ -174,8 +176,8 @@ class WebsocketServer:
         WebSocket 服务器的主循环，负责监听连接并处理通信。
         """
         async with websockets.serve(self.handler, self.host, self.port):
-            _connect_interface.info(
-                _connect_interface.tr("net_core.service.start_websocket")
+            _control_interface.info(
+                _control_interface.tr("net_core.service.start_websocket")
             )
             await asyncio.Future()  # 阻塞以保持服务器运行
 
@@ -194,7 +196,7 @@ class WebsocketServer:
                     # 解密并解析收到的消息
                     msg = rsa_decrypt(msg).decode()
                     msg = json.loads(msg)
-                    _connect_interface.debug(f"Received data from sub-server: {msg}")
+                    _control_interface.debug(f"Received data from sub-server: {msg}")
 
                     if msg["s"] == 1:
                         # 为新连接的子服务器生成唯一的 ID
@@ -206,14 +208,12 @@ class WebsocketServer:
                         self.broadcast_websockets.add(websocket)
                         self.servers_info[server_id] = msg["data"]
 
-                        from connect_core.cli.server.commands import _command_interface
-
                         completer = get_new_completer(list(self.websockets.keys()))
-                        _command_interface.set_completer_words(completer)
-                        _command_interface.flush_cli()
+                        _control_interface.cli_core.set_completer_words(completer)
+                        _control_interface.cli_core.flush_cli()
 
-                        _connect_interface.info(
-                            _connect_interface.tr(
+                        _control_interface.info(
+                            _control_interface.tr(
                                 "net_core.service.connect_websocket"
                             ).format(f"Server {server_id}")
                         )
@@ -239,7 +239,7 @@ class WebsocketServer:
 
                 except Exception as e:
                     # 处理解密或消息处理时发生的错误
-                    _connect_interface.debug(f"Error with sub-server connection: {e}")
+                    _control_interface.debug(f"Error with sub-server connection: {e}")
                     await websocket.close(reason="400")
                     self.close_connection(server_id, websocket)
                     break
@@ -267,11 +267,9 @@ class WebsocketServer:
             if websocket in self.broadcast_websockets:
                 self.broadcast_websockets.remove(websocket)
 
-            from connect_core.cli.server.commands import _command_interface
-
             completer = get_new_completer(list(self.websockets.keys()))
-            _command_interface.set_completer_words(completer)
-            _command_interface.flush_cli()
+            _control_interface.cli_core.set_completer_words(completer)
+            _control_interface.cli_core.flush_cli()
 
             get_new_completer(list(self.websockets.keys()))
 
@@ -285,14 +283,14 @@ class WebsocketServer:
                 }
             )
 
-            _connect_interface.info(
-                _connect_interface.tr(
+            _control_interface.info(
+                _control_interface.tr(
                     "net_core.service.disconnect_from_sub_websocket"
                 ).format(server_id)
             )
         else:
-            _connect_interface.warn(
-                _connect_interface.tr(
+            _control_interface.warn(
+                _control_interface.tr(
                     "net_core.service.disconnect_from_unknown_websocket"
                 )
             )
@@ -342,7 +340,7 @@ class WebsocketServer:
             # 复制文件
             shutil.copy(file_path, "./send_files/")
             file_hash = get_file_hash(file_path)
-            config = _connect_interface.get_config()
+            config = _control_interface.get_config()
             msg = {
                 "s": 0,
                 "id": server_id,
@@ -369,7 +367,7 @@ class WebsocketServer:
                 ]
                 asyncio.run(self.send_msg(self.websockets[server_id], msg))
         except (IOError, OSError) as e:
-            _connect_interface.error(f"Copy Error: {e}")
+            _control_interface.error(f"Copy Error: {e}")
 
     def broadcast(self, msg: dict, server_ids: list = []) -> None:
         """
@@ -394,10 +392,10 @@ class WebsocketServer:
         if msg["s"] == 0:
             if "msg" in msg["data"].keys():
                 if msg["id"] == "-----":
-                    if _connect_interface.is_mcdr():
+                    if get_mcdr():
                         pass # TODO
                     else:
-                        _connect_interface.info(msg["data"]["msg"])
+                        _control_interface.info(msg["data"]["msg"])
                 elif msg["id"] == "all":
                     msg = {
                         "s": 0,
@@ -407,10 +405,10 @@ class WebsocketServer:
                         "data": msg["data"],
                     }
                     self.broadcast(msg, [msg["from"]])
-                    if _connect_interface.is_mcdr():
+                    if get_mcdr():
                         pass # TODO
                     else:
-                        _connect_interface.info(msg["data"]["msg"])
+                        _control_interface.info(msg["data"]["msg"])
                 else:
                     msg = {
                         "s": 0,
@@ -426,8 +424,8 @@ class WebsocketServer:
                 if not self.wait_flie_list[file_hash][1]:
                     os.remove(self.wait_flie_list[file_hash][0])
                     del self.wait_flie_list[file_hash]
-                    _connect_interface.info(
-                        _connect_interface.tr(
+                    _control_interface.info(
+                        _control_interface.tr(
                             "net_core.service.sub_server_download_finish"
                         ).format(msg["from"])
                     )

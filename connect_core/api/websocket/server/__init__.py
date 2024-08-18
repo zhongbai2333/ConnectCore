@@ -1,3 +1,3 @@
-from connect_core.websocket.websocket_server import websocket_server_init, get_servers_info
+from connect_core.websocket.websocket_server import get_servers_info
 
-__all__ = ["websocket_server_init", "get_servers_info"]
+__all__ = ["get_servers_info"]

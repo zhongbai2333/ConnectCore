@@ -2,23 +2,23 @@ from cryptography.fernet import Fernet, InvalidToken
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.server_interface import ConnectCoreServerInterface
+    from connect_core.interface.contol_interface import ControlInterface
 
 # 全局变量，用于存储 Fernet 实例
 fernet = None
 
 
-def rsa_main(connect_interface: 'ConnectCoreServerInterface'):
+def rsa_main(control_interface: "ControlInterface"):
     """
     初始化 Fernet 实例。如果配置中存在密码，则使用该密码初始化 Fernet。
 
     Args:
-        connect_interface (ConnectCoreServerInterface): API接口
+        connect_interface (ControlInterface): API接口
     """
-    global fernet, _connect_interface
+    global fernet, _control_interface
 
-    _connect_interface = connect_interface
-    config = _connect_interface.get_config()
+    _control_interface = control_interface
+    config = _control_interface.get_config()
     password = config["password"]
     if password:
         fernet = Fernet(password.encode())
@@ -62,7 +62,7 @@ def rsa_decrypt(data: bytes) -> bytes:
         try:
             return fernet.decrypt(data)
         except InvalidToken as e:
-            _connect_interface.error(_connect_interface.tr("rsa.decrypt_error"))
+            _control_interface.error(_control_interface.tr("rsa.decrypt_error"))
             raise InvalidToken(f"Decryption failed: {e}")
     else:
         raise InvalidToken("Password initialization error or data error!")

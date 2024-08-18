@@ -1,67 +1,6 @@
-from time import sleep
-from connect_core.api.server_interface import ConnectCoreServerInterface
+import os, time, sys, threading
 
-global translate_temp, connect_interface, config
-
-
-####################
-# Public
-####################
-def cli_main():
-    """
-    程序主入口。
-    检查是否为第一次启动，决定初始化配置或直接启动客户端。
-    """
-    from connect_core.cli.storage import JsonDataEditor
-
-    global connect_interface, config
-
-    connect_interface = ConnectCoreServerInterface(is_server=False)
-    config_edit = JsonDataEditor()
-    config = connect_interface.get_config()
-    connect_interface.info("\nConnectCore Client Starting...")
-
-    # 判断是否是第一次启动
-    if config_edit.read():
-        start_server()
-    else:
-        from connect_core.api.tools import restart_program
-
-        # 初始化配置
-        config_edit.write(initialization_config())
-        connect_interface.info(
-            translate_temp["connect_core"]["cli"]["initialization_config"]["finish"]
-        )
-        sleep(3)
-        restart_program()
-
-
-####################
-# Private
-####################
-def start_server():
-    """
-    启动WebSocket客户端并初始化核心命令行程序。
-    """
-    from connect_core.api.websocket.client import websocket_client_init
-
-    connect_interface.info(
-        connect_interface.tr("cli.starting.welcome").format(
-            f"{config['ip']}:{config['port']}"
-        )
-    )
-    connect_interface.info(
-        connect_interface.tr("cli.starting.welcome_password").format(config["password"])
-    )
-
-    # 启动WebSocket客户端
-    websocket_client_init(connect_interface)
-
-    from connect_core.cli.client.commands import commands_main
-    from connect_core.api.rsa import rsa_main
-
-    rsa_main(connect_interface)
-    commands_main(connect_interface)
+global _control_interface, _config
 
 
 def initialization_config() -> dict:
@@ -72,7 +11,7 @@ def initialization_config() -> dict:
     Returns:
         dict: 包含初始配置的字典。
     """
-    from connect_core.cli.storage import YmlLanguage
+    from connect_core.storage import YmlLanguage
 
     # 选择语言
     lang = input("Choose language | 请选择语言: [EN_US/zh_cn] ")
@@ -111,12 +50,66 @@ def initialization_config() -> dict:
     )
     password = password if password else password_create
 
-    # 返回配置字典
-    return {
-        "language": lang,
-        "ip": ip,
-        "port": port,
-        "http_port": http_port,
-        "password": password,
-        "debug": False,
-    }
+    print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])
+
+    from connect_core.storage import JsonDataEditor
+    from connect_core.cli.tools import restart_program
+
+    JsonDataEditor("config.json").write(
+        {
+            "language": lang,
+            "ip": ip,
+            "port": port,
+            "http_port": http_port,
+            "password": password,
+            "debug": False,
+        }
+    )
+    time.sleep(3)
+    restart_program()
+
+
+def start_server():
+    """
+    启动WebSocket客户端并初始化核心命令行程序。
+    """
+    from connect_core.websocket.websocket_client import websocket_client_init
+
+    # 启动WebSocket客户端
+    websocket_client_init(_control_interface)
+
+    from connect_core.cli.client.commands import commands_main
+    from connect_core.rsa_encrypt import rsa_main
+
+    rsa_main(_control_interface)
+    commands_main(_control_interface)
+
+
+# Public
+def cli_main():
+    """
+    客户端启动主程序
+    """
+    if not os.path.exists("config.json"):
+        initialization_config()
+        return
+    # 获取控制接口
+    from connect_core.interface.get_interface import get_interface_main
+
+    global _control_interface, _config
+
+    _control_interface = get_interface_main("connect_core", sys.argv[0], "config.json")
+    _config = _control_interface.get_config()
+
+    _control_interface.info(
+        _control_interface.tr("cli.starting.welcome").format(
+            f"{_config['ip']}:{_config['port']}"
+        )
+    )
+    _control_interface.info(
+        _control_interface.tr("cli.starting.welcome_password").format(
+            _config["password"]
+        )
+    )
+
+    start_server()

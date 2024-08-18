@@ -8,26 +8,27 @@ from mcdreforged.api.all import new_thread
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.server_interface import ConnectCoreServerInterface
+    from connect_core.interface.contol_interface import ControlInterface
 
-from connect_core.api.rsa import rsa_encrypt, rsa_decrypt
-from connect_core.api.tools import verify_file_hash
-from connect_core.api.http import download_file
+from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.cli.tools import verify_file_hash
+from connect_core.http.http_client import download_file
+from connect_core.mcdr.mcdr_entry import get_mcdr
 
-global websocket_client, _connect_interface
+global websocket_client, _control_interface
 
 
 # Public
-def websocket_client_init(connect_interface: 'ConnectCoreServerInterface') -> None:
+def websocket_client_init(control_interface: 'ControlInterface') -> None:
     """
     初始化 WebSocket 客户端。
     根据运行环境选择启动 MCDR 多线程客户端或 CLI 线程客户端。
     """
-    global _connect_interface
+    global _control_interface
 
-    _connect_interface = connect_interface
+    _control_interface = control_interface
     sleep(0.3)
-    if connect_interface.is_mcdr():
+    if get_mcdr():
         start_mcdr_server()
     else:
         websocket_client_thread = threading.Thread(target=start_cli_server)
@@ -91,7 +92,7 @@ def get_new_completer(server_list: list):
     Returns:
         completer (dict): 重制后的提示词
     """
-    if _connect_interface.is_mcdr():
+    if get_mcdr():
         return None
 
     server_dict = {server: None for server in server_list}
@@ -137,7 +138,7 @@ class WebsocketClient:
         """
         初始化 WebSocket 客户端的基本配置。
         """
-        config = _connect_interface.get_config()
+        config = _control_interface.get_config()
         self.finish_start = False
         self.finish_close = False
         self.host = config["ip"]  # 服务器 IP 地址
@@ -171,9 +172,9 @@ class WebsocketClient:
         self.main_task = asyncio.create_task(self.main())
         try:
             await self.main_task
-            _connect_interface.info(_connect_interface.tr("net_core.service.stop_websocket"))
+            _control_interface.info(_control_interface.tr("net_core.service.stop_websocket"))
         except asyncio.CancelledError:
-            _connect_interface.info(_connect_interface.tr("net_core.service.stop_websocket"))
+            _control_interface.info(_control_interface.tr("net_core.service.stop_websocket"))
 
     async def main(self) -> None:
         """
@@ -186,8 +187,8 @@ class WebsocketClient:
                     f"ws://{self.host}:{self.port}"
                 ) as self.websocket:
                     self.finish_start = True
-                    _connect_interface.info(
-                        _connect_interface.tr("net_core.service.connect_websocket").format("")
+                    _control_interface.info(
+                        _control_interface.tr("net_core.service.connect_websocket").format("")
                     )
                     await self.receive()
                 break
@@ -210,12 +211,12 @@ class WebsocketClient:
                 if recv_data:
                     recv_data = rsa_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
-                    _connect_interface.debug(f"Received data from main server: {recv_data}")
+                    _control_interface.debug(f"Received data from main server: {recv_data}")
                     await self.parse_message(recv_data)
                 else:
                     break
             except asyncio.CancelledError:
-                _connect_interface.info(_connect_interface.tr("net_core.service.stop_receive"))
+                _control_interface.info(_control_interface.tr("net_core.service.stop_receive"))
                 self.finish_close = True
                 return
 
@@ -237,14 +238,14 @@ class WebsocketClient:
                 websockets.ConnectionClosedOK,
             ) as e:
                 if str(e) != "received 1000 (OK) 400; then sent 1000 (OK) 400":
-                    _connect_interface.info(
-                        _connect_interface.tr("net_core.service.disconnect_websocket") + str(e)
+                    _control_interface.info(
+                        _control_interface.tr("net_core.service.disconnect_websocket") + str(e)
                     )
                     os.system(f"title ConnectCore Client")
-                    websocket_client_init(_connect_interface)
+                    websocket_client_init(_control_interface)
                     return
                 else:
-                    _connect_interface.error(_connect_interface.tr("net_core.service.error_password"))
+                    _control_interface.error(_control_interface.tr("net_core.service.error_password"))
                     self.stop_server()
                     return
 
@@ -299,39 +300,36 @@ class WebsocketClient:
             os.system(f"title ConnectCore Client {msg["id"]}")
             self.server_id = msg["id"]
         elif msg["s"] == 0:
-            if msg["pluginid"] == "system":
-                data = msg["data"]
-                if "server_list" in data.keys():
-                    self.server_list = data["server_list"]
+            data = msg["data"]
+            if "server_list" in data.keys():
+                self.server_list = data["server_list"]
 
-                    from connect_core.cli.client.commands import _command_interface
+                new_server_list = self.server_list.copy()
+                new_server_list.remove(self.server_id)
 
-                    new_server_list = self.server_list.copy()
-                    new_server_list.remove(self.server_id)
-
-                    completer = get_new_completer(new_server_list)
-                    _command_interface.set_completer_words(completer)
-                    _command_interface.flush_cli()
-                if "msg" in data.keys():
-                    if _connect_interface.is_mcdr():
-                        pass # TODO
-                    else:
-                        _connect_interface.info(data["msg"])
-                if "file" in data.keys():
-                    data = data["file"]
-                    download_file(_connect_interface, data["path"], data["save_path"])
-                    while not verify_file_hash(data["save_path"], data["hash"]):
-                        download_file(_connect_interface, data["path"], data["save_path"])
-                    wait_send_msg = {
-                        "s": 0,
-                        "id": "-----",
-                        "from": self.server_id,
-                        "pluginid": "system",
-                        "data": {
-                            "file": {
-                                "hash": data["hash"]
-                            }
-                        },
-                    }
-                    await self.send_msg(wait_send_msg)
-                    _connect_interface.info(_connect_interface.tr("net_core.service.file_download_finish_from_other").format(msg["from"], data["save_path"]))
+                completer = get_new_completer(new_server_list)
+                _control_interface.cli_core.set_completer_words(completer)
+                _control_interface.cli_core.flush_cli()
+            if "msg" in data.keys():
+                if get_mcdr():
+                    pass # TODO
+                else:
+                    _control_interface.info(data["msg"])
+            if "file" in data.keys():
+                data = data["file"]
+                download_file(_control_interface, data["path"], data["save_path"])
+                while not verify_file_hash(data["save_path"], data["hash"]):
+                    download_file(_control_interface, data["path"], data["save_path"])
+                wait_send_msg = {
+                    "s": 0,
+                    "id": "-----",
+                    "from": self.server_id,
+                    "pluginid": "system",
+                    "data": {
+                        "file": {
+                            "hash": data["hash"]
+                        }
+                    },
+                }
+                await self.send_msg(wait_send_msg)
+                _control_interface.info(_control_interface.tr("net_core.service.file_download_finish_from_other").format(msg["from"], data["save_path"]))

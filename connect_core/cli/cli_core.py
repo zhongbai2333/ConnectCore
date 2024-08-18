@@ -4,16 +4,17 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.server_interface import ConnectCoreServerInterface
+    from connect_core.interface.contol_interface import ControlInterface
 
 # 命令行界面类
 class CommandLineInterface:
-    def __init__(self, interface: 'ConnectCoreServerInterface', prompt: str = ">>> "):
+
+    def __init__(self, interface: "ControlInterface", prompt: str = ">>> "):
         """
         初始化命令行界面类，设置默认提示符和补全器。
 
         Args:
-            connect_interface (ConnectCoreServerInterface): API接口
+            connect_interface (ControlInterface): API接口
         """
         self.prompt = prompt
         self.completer = NestedCompleter.from_nested_dict({})

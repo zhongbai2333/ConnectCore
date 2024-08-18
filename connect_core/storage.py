@@ -1,4 +1,4 @@
-import json, os, sys, zipfile
+import json, os, zipfile
 import yaml
 
 
@@ -30,17 +30,20 @@ class JsonDataEditor:
 
 
 class YmlLanguage:
-    def __init__(self, lang="en_us"):
+
+    def __init__(self, path: str, lang = "en_us"):
+        self.full_path = path
+        self.path, self.filename = os.path.split(path)
         self.translate = self._read_yaml(lang)
 
     # 读取yaml
     def _read_yaml(self, lang="en_us"):
-        if zipfile.is_zipfile(sys.argv[0]):
-            with zipfile.ZipFile(sys.argv[0], "r") as pyz:
+        if zipfile.is_zipfile(self.full_path):
+            with zipfile.ZipFile(self.full_path, "r") as pyz:
                 with pyz.open(f"lang/{lang}.yml") as f:
                     config_data = f.read().decode("utf-8")
                     return yaml.safe_load(config_data)
         else:
-            with open(f"lang/{lang}.yml", "r", encoding="utf-8") as f:
+            with open(f"{self.path}/lang/{lang}.yml", "r", encoding="utf-8") as f:
                 data = yaml.load(stream=f, Loader=yaml.FullLoader)
                 return data
