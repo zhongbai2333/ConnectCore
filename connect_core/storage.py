@@ -7,6 +7,8 @@ class JsonDataEditor:
         self.filepath = filepath
         # 检查文件是否存在，如果不存在则创建空的JSON文件
         if not os.path.exists(filepath):
+            path, _ = os.path.split(filepath)
+            os.makedirs(path)
             self._write_data()
 
     def _read_data(self):

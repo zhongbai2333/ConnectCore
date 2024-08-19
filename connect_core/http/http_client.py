@@ -4,10 +4,12 @@ from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.interface.contol_interface import ControlInterface
+    from connect_core.interface.control_interface import CoreControlInterface
 
 
-def upload_file(control_interface: "ControlInterface", url: str, file_path: str) -> int:
+def upload_file(
+    control_interface: "CoreControlInterface", url: str, file_path: str
+) -> int:
     """
     上传文件到指定URL，并在上传前对文件进行RSA加密。
 
@@ -36,7 +38,7 @@ def upload_file(control_interface: "ControlInterface", url: str, file_path: str)
 
 
 def download_file(
-    control_interface: "ControlInterface", url: str, save_path: str
+    control_interface: "CoreControlInterface", url: str, save_path: str
 ) -> int:
     """
     从指定URL下载文件，并在保存前对文件进行RSA解密。

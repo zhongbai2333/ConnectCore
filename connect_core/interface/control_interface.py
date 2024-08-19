@@ -1,17 +1,14 @@
-# public
-class ControlInterface:
-    def __init__(self, sid: str, self_path: str, config_path: str):
-        """
-        控制接口初始化
-        """
-        from connect_core.log_system import LogSystem
-        from connect_core.cli.cli_core import CommandLineInterface
+from connect_core.log_system import LogSystem
 
-        self.sid = sid  # ID
-        self.self_path = self_path  # 自身路径
-        self.config_path = config_path  # 配置文件路径
+class CoreControlInterface:
+    def __init__(self):
+        import sys
+
+        self.sid = "connect_core"
+        self.self_path = sys.argv[0]
+        self.config_path = "./config.json"
         self.log_system = LogSystem(
-            sid,
+            self.sid,
             (
                 self.get_config()["debug"]
                 if "debug" in self.get_config().keys()
@@ -23,7 +20,6 @@ class ControlInterface:
             if "language" in self.get_config().keys()
             else "en_us"
         )
-        self.cli_core = CommandLineInterface(self)
 
     # =============
     #  Json Editer
@@ -145,52 +141,103 @@ class ControlInterface:
         """
         self.log_system.debug(str(msg))
 
+
+class PluginControlInterface(CoreControlInterface):
+    def __init__(self, sid: str, self_path: str, config_path: str):
+        """
+        插件控制接口
+
+        Args:
+            sid (str): 插件ID
+            self_path (str): 自身路径
+            config_path (str): 配置文件路径
+        """
+        # 导入
+        super().__init__()
+
+        self.sid = sid
+        self.self_path = self_path
+        self.config_path = config_path
+        self.log_system = LogSystem(
+            self.sid,
+            (
+                self.get_config()["debug"]
+                if "debug" in self.get_config().keys()
+                else False
+            ),
+        )
+        self.language = (
+            self.get_config()["language"]
+            if "language" in self.get_config().keys()
+            else "en_us"
+        )
+
     # ========
     #   Send
     # ========
-    def send_data(self, server_id: str, data: dict):
+    def send_data(self, server_id: str, plugin_id: str, data: dict):
         """
         向指定的服务器发送消息。
 
         Args:
-            server_id (str): 子服务器的唯一标识符。
+            server_id (str): 目标服务器的唯一标识符。
+            plugin_id (str): 目标服务器插件的唯一标识符
             data (str): 要发送的数据。
         """
-        from connect_core.websocket.websocket_server import websocket_server
+        from connect_core.websocket.server import websocket_server
 
         if websocket_server:
-            from connect_core.websocket.websocket_server import (
+            from connect_core.websocket.server import (
                 send_data as server_send_data,
             )
 
-            server_send_data(self.sid, server_id, data)
+            server_send_data("-----", self.sid, server_id, plugin_id, data)
         else:
-            from connect_core.websocket.websocket_client import (
+            from connect_core.websocket.client import (
                 send_data as client_send_data,
             )
 
-            client_send_data(self.sid, server_id, data)
+            client_send_data(self.sid, server_id, plugin_id, data)
 
-    def send_file(self, server_id: str, file_path: str, save_path: str = None):
+    def send_file(
+        self, server_id: str, plugin_id: str, file_path: str, save_path: str = None
+    ):
         """
         向指定的服务器发送文件。
 
         Args:
-            server_id (str): 子服务器的唯一标识符。
+            server_id (str): 目标服务器的唯一标识符。
+            plugin_id (str): 目标服务器插件的唯一标识符
             file_path (str): 要发送的文件目录。
             save_path (str): 要保存的位置。
         """
-        from connect_core.websocket.websocket_server import websocket_server
+        from connect_core.websocket.server import websocket_server
 
         if websocket_server:
-            from connect_core.websocket.websocket_server import (
+            from connect_core.websocket.server import (
                 send_file as server_send_file,
             )
 
-            server_send_file(self.sid, server_id, file_path, save_path)
+            server_send_file(
+                "-----", self.sid, server_id, plugin_id, file_path, save_path
+            )
         else:
-            from connect_core.websocket.websocket_client import (
+            from connect_core.websocket.client import (
                 send_file as client_send_file,
             )
 
-            client_send_file(self.sid, server_id, file_path, save_path)
+            client_send_file(self.sid, server_id, plugin_id, file_path, save_path)
+
+    # =========
+    #   Tools
+    # =========
+    def is_server(self) -> bool:
+        """
+        判断是否为服务器
+
+        Returns:
+            bool: 是/否
+        """
+        from connect_core.websocket.server import websocket_server
+
+        return True if websocket_server else False

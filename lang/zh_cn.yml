@@ -9,25 +9,6 @@ connect_core:
     starting:
       welcome: "请将群组重定向至 {}"
       welcome_password: "群组密钥为 {}"
-    server_commands:
-      help: "==help==\n
-      help: 获取帮助列表\n
-      list: 获取子服务器列表\n
-      send: 发送消息或文件\n
-      reload: 重载程序和插件\n
-      exit: 退出"
-      send: "send <msg|file> <ID> <[msg]|[path]> 发送文件或消息"
-      no_file: "没有这个文件！"
-    client_commands:
-      help: "==help==\n
-      help: 获取帮助列表\n
-      info: 获取服务器状态\n
-      list: 获取子服务器列表\n
-      send: 发送消息或文件\n
-      reload: 重载程序和插件\n
-      exit: 退出"
-      send: "send <msg|file> <ID> <[msg]|[path]> [save_path] 发送文件或消息"
-      no_file: "没有这个文件！"
   net_core:
     service:
       start_http: "HTTP 文件服务器已启动于 {}"
@@ -43,3 +24,8 @@ connect_core:
       file_download_finish_from_other: "来自服务器 {} 的文件已下载完成！文件已保存至 {}"
   rsa:
     decrypt_error: "解密失败，密钥错误或数据被篡改！"
+  plugin:
+    load_finish: "插件 {} v{} 加载成功！"
+    cant_load: "无法加载插件 {} , 可能没有与ConnectCore兼容！"
+    cant_initialize : "插件 {} 没有初始化函数"
+    unload_finish: "插件 {} 已卸载！"

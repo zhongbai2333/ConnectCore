@@ -2,18 +2,18 @@ from cryptography.fernet import Fernet, InvalidToken
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.interface.contol_interface import ControlInterface
+    from connect_core.interface.control_interface import CoreControlInterface
 
 # 全局变量，用于存储 Fernet 实例
 fernet = None
 
 
-def rsa_main(control_interface: "ControlInterface"):
+def rsa_main(control_interface: "CoreControlInterface"):
     """
     初始化 Fernet 实例。如果配置中存在密码，则使用该密码初始化 Fernet。
 
     Args:
-        connect_interface (ControlInterface): API接口
+        connect_interface (CoreControlInterface): API接口
     """
     global fernet, _control_interface
 

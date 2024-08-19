@@ -6,12 +6,12 @@ import cgi
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.interface.contol_interface import ControlInterface
+    from connect_core.interface.control_interface import CoreControlInterface
 
 from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
 
 
-def http_main(control_interface: "ControlInterface"):
+def http_main(control_interface: "CoreControlInterface"):
     class ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
 
