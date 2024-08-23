@@ -1,3 +1,3 @@
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt, rsa_main
+from connect_core.aes_encrypt import aes_encrypt, aes_decrypt, aes_main
 
-__all__ = ["rsa_encrypt", "rsa_decrypt"]
+__all__ = ["aes_encrypt", "aes_decrypt"]

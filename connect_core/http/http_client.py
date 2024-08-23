@@ -1,6 +1,6 @@
 import os
 import requests
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ def upload_file(
     try:
         with open(file_path, "rb") as file:
             file_data = file.read()
-            encrypted_data = rsa_encrypt(file_data)
+            encrypted_data = aes_encrypt(file_data)
 
         files = {"file": (os.path.basename(file_path), encrypted_data)}
         response = requests.post(url, files=files)
@@ -56,7 +56,7 @@ def download_file(
         if response.status_code == 200:
             encrypted_data = response.content
             try:
-                file_data = rsa_decrypt(encrypted_data)
+                file_data = aes_decrypt(encrypted_data)
 
                 with open(save_path, "wb") as file:
                     file.write(file_data)

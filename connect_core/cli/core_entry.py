@@ -74,9 +74,9 @@ def server() -> None:
         """
         from connect_core.http.http_server import http_main
         from connect_core.websocket.server import websocket_server_main
-        from connect_core.rsa_encrypt import rsa_main
+        from connect_core.aes_encrypt import aes_main
 
-        rsa_main(_control_interface)
+        aes_main(_control_interface)
 
         time.sleep(0.3)
 
@@ -201,9 +201,9 @@ def client() -> None:
         启动WebSocket客户端并初始化核心命令行程序。
         """
         from connect_core.websocket.client import websocket_client_main
-        from connect_core.rsa_encrypt import rsa_main
+        from connect_core.aes_encrypt import aes_main
 
-        rsa_main(_control_interface)
+        aes_main(_control_interface)
         # 启动WebSocket客户端
         websocket_client_main(_control_interface)
 

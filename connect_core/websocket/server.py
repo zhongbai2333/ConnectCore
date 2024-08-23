@@ -2,7 +2,7 @@ import random, string, asyncio, websockets, json, shutil, os
 from mcdreforged.api.all import new_thread
 
 from connect_core.mcdr.mcdr_entry import get_mcdr
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.cli.tools import get_file_hash, verify_file_hash
 from typing import TYPE_CHECKING
 
@@ -89,7 +89,7 @@ class WebsocketServer:
                 msg = await websocket.recv()
                 try:
                     # 解密并解析收到的消息
-                    msg = rsa_decrypt(msg).decode()
+                    msg = aes_decrypt(msg).decode()
                     msg = json.loads(msg)
                     _control_interface.debug(f"Received data from sub-server: {msg}")
 
@@ -211,7 +211,7 @@ class WebsocketServer:
             websocket: 目标 WebSocket 客户端。
 
         """
-        await websocket.send(rsa_encrypt(json.dumps(data).encode()))
+        await websocket.send(aes_encrypt(json.dumps(data).encode()))
 
     def broadcast(self, data: dict, server_ids: list = []) -> None:
         """
@@ -224,7 +224,7 @@ class WebsocketServer:
         websocket_list = self.broadcast_websockets.copy()
         for i in server_ids:
             websocket_list.remove(self.websockets[i])
-        websockets.broadcast(websocket_list, rsa_encrypt(json.dumps(data).encode()))
+        websockets.broadcast(websocket_list, aes_encrypt(json.dumps(data).encode()))
 
     # ======================
     #   Send Data to Other

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from connect_core.interface.control_interface import CoreControlInterface
 
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 
 
 def http_main(control_interface: "CoreControlInterface"):
@@ -23,7 +23,7 @@ def http_main(control_interface: "CoreControlInterface"):
             if os.path.isfile(file_path):
                 with open(file_path, "rb") as f:
                     file_data = f.read()
-                encrypted_data = rsa_encrypt(file_data)
+                encrypted_data = aes_encrypt(file_data)
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
@@ -57,7 +57,7 @@ def http_main(control_interface: "CoreControlInterface"):
 
                     # 解密文件数据
                     try:
-                        file_data = rsa_decrypt(encrypted_data)
+                        file_data = aes_decrypt(encrypted_data)
                     except Exception as e:
                         self.send_response(400)
                         self.end_headers()

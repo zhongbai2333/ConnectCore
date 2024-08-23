@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from connect_core.interface.control_interface import CoreControlInterface
-from connect_core.rsa_encrypt import rsa_encrypt, rsa_decrypt
+from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.cli.tools import verify_file_hash, get_file_hash
 from connect_core.http.http_client import download_file, upload_file
 from connect_core.mcdr.mcdr_entry import get_mcdr
@@ -141,7 +141,7 @@ class WebsocketClient:
             try:
                 recv_data = await self.receive_task
                 if recv_data:
-                    recv_data = rsa_decrypt(recv_data).decode()
+                    recv_data = aes_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
                     _control_interface.debug(
                         f"Received data from main server: {recv_data}"
@@ -166,7 +166,7 @@ class WebsocketClient:
         Args:
             data (dict): 要发送的消息内容。
         """
-        await self.websocket.send(rsa_encrypt(json.dumps(data).encode()))
+        await self.websocket.send(aes_encrypt(json.dumps(data).encode()))
 
     # ======================
     #   Send Data to Other

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 fernet = None
 
 
-def rsa_main(control_interface: "CoreControlInterface"):
+def aes_main(control_interface: "CoreControlInterface"):
     """
     初始化 Fernet 实例。如果配置中存在密码，则使用该密码初始化 Fernet。
 
@@ -26,7 +26,7 @@ def rsa_main(control_interface: "CoreControlInterface"):
         fernet = None
 
 
-def rsa_encrypt(data: bytes) -> bytes:
+def aes_encrypt(data: bytes) -> bytes:
     """
     加密数据
 
@@ -45,7 +45,7 @@ def rsa_encrypt(data: bytes) -> bytes:
         raise InvalidToken("Password initialization error!")
 
 
-def rsa_decrypt(data: bytes) -> bytes:
+def aes_decrypt(data: bytes) -> bytes:
     """
     解密数据
 
