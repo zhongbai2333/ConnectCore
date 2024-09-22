@@ -229,7 +229,7 @@ class WebsocketServer:
     # ======================
     #   Send Data to Other
     # ======================
-    def send_data_to_other_server(
+    async def send_data_to_other_server(
         self,
         f_server_id: str,
         f_plugin_id: str,
@@ -257,9 +257,9 @@ class WebsocketServer:
         if t_server_id == "all":
             self.broadcast(msg)
         else:
-            asyncio.run(self.send(msg, self.websockets[t_server_id]))
+            await self.send(msg, self.websockets[t_server_id])
 
-    def send_file_to_other_server(
+    async def send_file_to_other_server(
         self,
         f_server_id: str,
         f_plugin_id: str,
@@ -307,7 +307,7 @@ class WebsocketServer:
                     f"./send_files/{os.path.basename(file_path)}",
                     [t_server_id],
                 ]
-                asyncio.run(self.send(msg, self.websockets[t_server_id]))
+                await self.send(msg, self.websockets[t_server_id])
         except (IOError, OSError) as e:
             _control_interface.error(f"Copy Error: {e}")
 
@@ -328,7 +328,7 @@ class WebsocketServer:
 
                     recv_data(data["to"]["pluginid"], data["data"])
                 elif data["to"]["id"] == "all":
-                    self.send_data_to_other_server(
+                    await self.send_data_to_other_server(
                         data["from"]["id"],
                         data["from"]["pluginid"],
                         "all",
@@ -339,7 +339,7 @@ class WebsocketServer:
 
                     recv_data(data["to"]["pluginid"], data["data"])
                 else:
-                    self.send_data_to_other_server(
+                    await self.send_data_to_other_server(
                         data["from"]["id"],
                         data["from"]["pluginid"],
                         data["to"]["id"],
@@ -349,14 +349,14 @@ class WebsocketServer:
             elif data["status"] == "RecvFile":
                 file_hash = data["file"]["hash"]
                 self.wait_flie_list[file_hash][1].remove(data["from"]["id"])
+                _control_interface.info(
+                    _control_interface.tr(
+                        "net_core.service.sub_server_download_finish"
+                    ).format(data["from"]["id"])
+                )
                 if not self.wait_flie_list[file_hash][1]:
                     os.remove(self.wait_flie_list[file_hash][0])
                     del self.wait_flie_list[file_hash]
-                    _control_interface.info(
-                        _control_interface.tr(
-                            "net_core.service.sub_server_download_finish"
-                        ).format(data["from"]["id"])
-                    )
             elif data["status"] == "RequestSendFile":
                 config = _control_interface.get_config()
                 msg = {
@@ -389,7 +389,7 @@ class WebsocketServer:
                     from connect_core.plugin.init_plugin import recv_file
 
                     recv_file(data["to"]["pluginid"], data["file"]["save_path"])
-                    self.send_file_to_other_server(
+                    await self.send_file_to_other_server(
                         data["from"]["id"],
                         data["from"]["pluginid"],
                         data["to"]["id"],
@@ -399,7 +399,7 @@ class WebsocketServer:
                         [data["from"]["id"]],
                     )
                 else:
-                    self.send_file_to_other_server(
+                    await self.send_file_to_other_server(
                         data["from"]["id"],
                         data["from"]["pluginid"],
                         data["to"]["id"],
@@ -525,9 +525,9 @@ def send_data(
         t_plugin_id (str): 子服务器插件的唯一标识符
         data (dict): 要发送的消息内容。
     """
-    websocket_server.send_data_to_other_server(
+    asyncio.run(websocket_server.send_data_to_other_server(
         f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
-    )
+    ))
 
 
 def send_file(
@@ -549,6 +549,6 @@ def send_file(
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    websocket_server.send_file_to_other_server(
+    asyncio.run(websocket_server.send_file_to_other_server(
         f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-    )
+    ))
