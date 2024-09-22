@@ -2,6 +2,7 @@ import time, os, threading
 
 from connect_core.interface.control_interface import CoreControlInterface
 
+global _is_server
 
 def server() -> None:
     # Function
@@ -72,7 +73,7 @@ def server() -> None:
         """
         创建并启动HTTP和WebSocket服务器的线程。
         """
-        from connect_core.http.http_server import http_main
+        from connect_core.http.server import http_main
         from connect_core.websocket.server import websocket_server_main
         from connect_core.aes_encrypt import aes_main
 
@@ -245,6 +246,8 @@ def core_entry_init(is_server: bool) -> None:
     """
     核心程序主程序
     """
+    global _is_server
+    _is_server = is_server
     # 获取控制接口
     if is_server:
         server()

@@ -32,8 +32,7 @@ class JsonDataEditor:
 
 
 class YmlLanguage:
-
-    def __init__(self, path: str, lang = "en_us"):
+    def __init__(self, path: str, lang="en_us"):
         self.full_path = path
         self.path, self.filename = os.path.split(path)
         self.translate = self._read_yaml(lang)

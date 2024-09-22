@@ -143,12 +143,13 @@ class CoreControlInterface:
 
 
 class PluginControlInterface(CoreControlInterface):
-    def __init__(self, sid: str, self_path: str, config_path: str):
+    def __init__(self, sid: str, sinfo: dict, self_path: str, config_path: str):
         """
         插件控制接口
 
         Args:
             sid (str): 插件ID
+            sinfo (dict): 插件Info
             self_path (str): 自身路径
             config_path (str): 配置文件路径
         """
@@ -156,6 +157,7 @@ class PluginControlInterface(CoreControlInterface):
         super().__init__()
 
         self.sid = sid
+        self.sinfo = sinfo
         self.self_path = self_path
         self.config_path = config_path
         self.log_system = LogSystem(
@@ -165,11 +167,6 @@ class PluginControlInterface(CoreControlInterface):
                 if "debug" in self.get_config().keys()
                 else False
             ),
-        )
-        self.language = (
-            self.get_config()["language"]
-            if "language" in self.get_config().keys()
-            else "en_us"
         )
 
     # ========
@@ -238,6 +235,20 @@ class PluginControlInterface(CoreControlInterface):
         Returns:
             bool: 是/否
         """
-        from connect_core.websocket.server import websocket_server
+        from connect_core.cli.core_entry import _is_server
 
-        return True if websocket_server else False
+        return _is_server
+
+    def get_server_id(self) -> str:
+        """
+        客户端反馈服务器ID
+
+        Returns:
+            str: 服务器ID
+        """
+        from connect_core.websocket.client import get_server_id
+
+        if self.is_server():
+            return None
+        else:
+            return get_server_id()

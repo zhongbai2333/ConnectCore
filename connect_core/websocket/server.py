@@ -444,8 +444,14 @@ class WebsocketServer:
             if verify_file_hash(data["file"]["save_path"], data["file"]["hash"]):
                 msg = {
                     "s": 0,
-                    "to": {data["from"]["id"], data["from"]["pluginid"]},
-                    "from": {data["to"]["id"], data["to"]["pluginid"]},
+                    "to": {
+                        "id": data["from"]["id"],
+                        "pluginid": data["from"]["pluginid"],
+                    },
+                    "from": {
+                        "id": data["to"]["id"],
+                        "pluginid": data["to"]["pluginid"],
+                    },
                     "status": "RecvFile",
                     "file": {"hash": data["file"]["hash"]},
                 }

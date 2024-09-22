@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from connect_core.interface.control_interface import CoreControlInterface
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.cli.tools import verify_file_hash, get_file_hash
-from connect_core.http.http_client import download_file, upload_file
+from connect_core.http.client import download_file, upload_file
 from connect_core.mcdr.mcdr_entry import get_mcdr
 
 from mcdreforged.api.all import new_thread
@@ -261,8 +261,8 @@ class WebsocketClient:
                     download_file(_control_interface, data["file"]["path"], data["file"]["save_path"])
                 wait_send_msg = {
                     "s": 0,
-                    "to": {"-----", data["from"]["pluginid"]},
-                    "from": {self.server_id, data["to"]["pluginid"]},
+                    "to": {"id": "-----", "pluginid": data["from"]["pluginid"]},
+                    "from": {"id": self.server_id, "pluginid": data["to"]["pluginid"]},
                     "status": "RecvFile",
                     "file": {
                         "hash": data["file"]["hash"]
@@ -274,8 +274,7 @@ class WebsocketClient:
 
                 recv_file(data["to"]["pluginid"], data["file"]["save_path"])
             elif data["status"] == "SendFileOK":
-                from connect_core.http.http_client import upload_file
-                upload_file(data["file"]["path"], data["file"]["file_path"])
+                upload_file(_control_interface, data["file"]["path"], data["file"]["file_path"])
                 msg = {
                     "s": 0,
                     "to": {
@@ -367,3 +366,13 @@ def send_file(
     websocket_client.send_file_to_other_server(
         f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
     )
+
+
+def get_server_id() -> str:
+    """
+    获取客户端ID
+
+    Returns:
+        str: 服务器ID
+    """
+    return websocket_client.server_id
