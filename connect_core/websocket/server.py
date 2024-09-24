@@ -89,55 +89,76 @@ class WebsocketServer:
                 msg = await websocket.recv()
                 try:
                     # 解密并解析收到的消息
-                    msg = aes_decrypt(msg).decode()
+                    if str(msg.decode())[0] != "{":
+                        msg = aes_decrypt(msg).decode()
                     msg = json.loads(msg)
                     _control_interface.debug(f"Received data from sub-server: {msg}")
 
                     if msg["s"] == 1:
-                        # 为新连接的子服务器生成唯一的 ID
-                        server_id = self.generate_random_id(5)
-                        while server_id in self.websockets:
-                            server_id = self.generate_random_id(5)
+                        if msg["status"] == "Register":
+                            asyncio.sleep(0.3)
+                            await self.send(
+                                {
+                                    "s": 1,
+                                    "id": "",
+                                    "from": "-----",
+                                    "status": "ConnectOK",
+                                    "data": {},
+                                },
+                                websocket,
+                                False,
+                            )
+                            _control_interface.debug(f"An New Account Register Quest From {msg['data']['path']}")
+                        elif msg["status"] == "Connect":
+                            if msg["data"]["account"] == "":
+                                # 为新连接的子服务器生成唯一的 ID
+                                server_id = self.generate_random_id(5)
+                                while server_id in self.websockets:
+                                    server_id = self.generate_random_id(5)
+                            else:
+                                server_id = msg["data"]["account"]
 
-                        self.websockets[server_id] = websocket
-                        self.broadcast_websockets.add(websocket)
-                        self.servers_info[server_id] = msg["data"]
+                            self.websockets[server_id] = websocket
+                            self.broadcast_websockets.add(websocket)
+                            self.servers_info[server_id] = msg["data"]
 
-                        from connect_core.plugin.init_plugin import (
-                            new_connect,
-                            connected,
-                        )
+                            from connect_core.plugin.init_plugin import (
+                                new_connect,
+                                connected,
+                            )
 
-                        connected()
-                        new_connect(list(self.servers_info.keys()))
+                            connected()
+                            new_connect(list(self.servers_info.keys()))
 
-                        _control_interface.info(
-                            _control_interface.tr(
-                                "net_core.service.connect_websocket"
-                            ).format(f"Server {server_id}")
-                        )
+                            _control_interface.info(
+                                _control_interface.tr(
+                                    "net_core.service.connect_websocket"
+                                ).format(f"Server {server_id}")
+                            )
 
-                        # 发送连接成功的确认消息
-                        await self.send(
-                            {
-                                "s": 1,
-                                "id": server_id,
-                                "from": "-----",
-                                "status": "Succeed",
-                                "data": {},
-                            },
-                            websocket,
-                        )
+                            # 发送连接成功的确认消息
+                            await self.send(
+                                {
+                                    "s": 1,
+                                    "id": server_id,
+                                    "from": "-----",
+                                    "status": "Connected",
+                                    "data": {},
+                                },
+                                websocket,
+                            )
 
-                        self.broadcast(
-                            {
-                                "s": 2,
-                                "id": "all",
-                                "from": "-----",
-                                "status": "NewServer",
-                                "data": {"server_list": list(self.servers_info.keys())},
-                            }
-                        )
+                            self.broadcast(
+                                {
+                                    "s": 2,
+                                    "id": "all",
+                                    "from": "-----",
+                                    "status": "NewServer",
+                                    "data": {
+                                        "server_list": list(self.servers_info.keys())
+                                    },
+                                }
+                            )
 
                     else:
                         await self.parse_msg(msg)
@@ -202,7 +223,7 @@ class WebsocketServer:
     # =============
     #   Send Data
     # =============
-    async def send(self, data: dict, websocket) -> None:
+    async def send(self, data: dict, websocket, encrypt: bool = True) -> None:
         """
         向指定的 WebSocket 客户端发送消息。
 
@@ -211,7 +232,10 @@ class WebsocketServer:
             websocket: 目标 WebSocket 客户端。
 
         """
-        await websocket.send(aes_encrypt(json.dumps(data).encode()))
+        if encrypt:
+            await websocket.send(aes_encrypt(json.dumps(data).encode()))
+        else:
+            await websocket.send(json.dumps(data).encode())
 
     def broadcast(self, data: dict, server_ids: list = []) -> None:
         """
@@ -525,9 +549,11 @@ def send_data(
         t_plugin_id (str): 子服务器插件的唯一标识符
         data (dict): 要发送的消息内容。
     """
-    asyncio.run(websocket_server.send_data_to_other_server(
-        f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
-    ))
+    asyncio.run(
+        websocket_server.send_data_to_other_server(
+            f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+        )
+    )
 
 
 def send_file(
@@ -549,6 +575,8 @@ def send_file(
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    asyncio.run(websocket_server.send_file_to_other_server(
-        f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-    ))
+    asyncio.run(
+        websocket_server.send_file_to_other_server(
+            f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+        )
+    )

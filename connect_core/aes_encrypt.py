@@ -8,18 +8,17 @@ if TYPE_CHECKING:
 fernet = None
 
 
-def aes_main(control_interface: "CoreControlInterface"):
+def aes_main(control_interface: "CoreControlInterface", password: str):
     """
     初始化 Fernet 实例。如果配置中存在密码，则使用该密码初始化 Fernet。
 
     Args:
         connect_interface (CoreControlInterface): API接口
+        password (str): 临时密码
     """
     global fernet, _control_interface
 
     _control_interface = control_interface
-    config = _control_interface.get_config()
-    password = config["password"]
     if password:
         fernet = Fernet(password.encode())
     else:

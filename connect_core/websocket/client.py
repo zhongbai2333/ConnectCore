@@ -133,15 +133,21 @@ class WebsocketClient:
         接收并处理从服务器发送的消息。
         初始连接时会向服务器发送连接状态消息。
         """
-        await self.send(
-            {"s": 1, "id": "-----", "status": "Connect", "data": {"path": sys.argv[0]}}
-        )
+        if _control_interface.get_config()["account"]:
+            await self.send( 
+                {"s": 1, "id": "-----", "status": "Login", "data": {}}
+            )
+        else:
+            await self.send(
+                {"s": 1, "id": "-----", "status": "Register", "data": {"path": sys.argv[0]}}
+            )
         while True:
             self.receive_task = asyncio.create_task(self.get_recv())
             try:
                 recv_data = await self.receive_task
                 if recv_data:
-                    recv_data = aes_decrypt(recv_data).decode()
+                    if str(recv_data.decode())[0] != "{":
+                        recv_data = aes_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
                     _control_interface.debug(
                         f"Received data from main server: {recv_data}"
@@ -166,7 +172,14 @@ class WebsocketClient:
         Args:
             data (dict): 要发送的消息内容。
         """
-        await self.websocket.send(aes_encrypt(json.dumps(data).encode()))
+        
+        if _control_interface.get_config()["account"]:
+            await self.websocket.send(json.dumps(data = {
+            "account": _control_interface.get_config()["account"],
+            "data": aes_encrypt(json.dumps(data).encode())
+        }).encode())
+        else:
+            await self.websocket.send(json.dumps(data).encode())
 
     # ======================
     #   Send Data to Other
@@ -239,8 +252,16 @@ class WebsocketClient:
             msg (dict): 从服务器接收到的消息内容。
         """
         if data["s"] == 1:
-            os.system(f"title ConnectCore Client {data["id"]}")
-            self.server_id = data["id"]
+            if data["status"] == "ConnectOK":
+                await self.send({
+                    "s": 1,
+                    "id": "-----",
+                    "status": "Connect",
+                    "data": {"account": _control_interface.get_config()["account"], "path": sys.argv[0]}
+                })
+            elif data["status"] == "Connected":
+                os.system(f"title ConnectCore Client {data["id"]}")
+                self.server_id = data["id"]
         elif data["s"] == 2:
             if data["status"] == "NewServer":
                 from connect_core.plugin.init_plugin import new_connect
