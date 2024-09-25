@@ -64,6 +64,9 @@ def server() -> None:
         """
         from connect_core.http.server import http_main
         from connect_core.websocket.server import websocket_server_main
+        from connect_core.aes_encrypt import aes_main
+
+        aes_main(_control_interface)
 
         time.sleep(0.3)
 

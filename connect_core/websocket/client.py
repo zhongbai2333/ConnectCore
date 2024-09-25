@@ -135,7 +135,7 @@ class WebsocketClient:
         """
         if _control_interface.get_config()["account"]:
             await self.send( 
-                {"s": 1, "id": "-----", "status": "Login", "data": {}}
+                {"s": 1, "id": "-----", "status": "Connect", "data": {"path": sys.argv[0]}}
             )
         else:
             await self.send(
@@ -165,21 +165,25 @@ class WebsocketClient:
     # ============
     #   Send Msg
     # ============
-    async def send(self, data: dict) -> None:
+    async def send(self, data: dict, account: str = None) -> None:
         """
         向服务器发送消息。
 
         Args:
             data (dict): 要发送的消息内容。
         """
-        
-        if _control_interface.get_config()["account"]:
-            await self.websocket.send(json.dumps(data = {
-            "account": _control_interface.get_config()["account"],
-            "data": aes_encrypt(json.dumps(data).encode())
-        }).encode())
+        if account is None:
+            account = _control_interface.get_config()["account"]
+        if account:
+            await self.websocket.send(json.dumps({
+                "account": account,
+                "data": aes_encrypt(json.dumps(data).encode())
+            }).encode())
         else:
-            await self.websocket.send(json.dumps(data).encode())
+            await self.websocket.send(json.dumps({
+                "account": account,
+                "data": json.dumps(data).encode()
+            }).encode())
 
     # ======================
     #   Send Data to Other
@@ -259,6 +263,14 @@ class WebsocketClient:
                     "status": "Connect",
                     "data": {"account": _control_interface.get_config()["account"], "path": sys.argv[0]}
                 })
+            elif data["status"] == "Registered":
+                from connect_core.aes_encrypt import aes_main
+                config = _control_interface.get_config()
+                config["account"] == data["id"]
+                config["password"] == data["data"]["password"]
+                aes_main(_control_interface, data["data"]["password"])
+                self.stop_server()
+                self.start_server()
             elif data["status"] == "Connected":
                 os.system(f"title ConnectCore Client {data["id"]}")
                 self.server_id = data["id"]

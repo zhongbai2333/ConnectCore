@@ -29,6 +29,7 @@ class WebsocketServer:
         self.broadcast_websockets = set()  # 需要广播消息的 WebSocket 客户端集合
         self.servers_info = {}  # 存储已连接的子服务器的信息
         self.wait_flie_list = {}  # 存储等待下载的文件信息
+        self.wait_register_connect = {}  # 存储等待注册的连接
 
     # ===========
     #   Control
@@ -89,10 +90,29 @@ class WebsocketServer:
                 msg = await websocket.recv()
                 try:
                     # 解密并解析收到的消息
-                    if str(msg.decode())[0] != "{":
-                        msg = aes_decrypt(msg).decode()
                     msg = json.loads(msg)
-                    _control_interface.debug(f"Received data from sub-server: {msg}")
+                    account = msg["account"]
+                    accounts = _control_interface.get_config("account.json")
+                    if account != "":
+                        if account == "-----":
+                            from connect_core.account.register_system import (
+                                get_register_password,
+                            )
+
+                            msg = aes_decrypt(
+                                msg["data"], get_register_password()
+                            ).decode()
+                        elif account in accounts.keys():
+                            msg = aes_decrypt(msg["data"], accounts[account]).decode()
+                        else:
+                            await websocket.close(reason="400")
+                            _control_interface.error(f"Unknown Account: {account}")
+                            break
+                    else:
+                        msg = msg["data"]
+                    _control_interface.debug(
+                        f"Received data from sub-server {account}: {msg}"
+                    )
 
                     if msg["s"] == 1:
                         if msg["status"] == "Register":
@@ -106,59 +126,78 @@ class WebsocketServer:
                                     "data": {},
                                 },
                                 websocket,
-                                False,
                             )
-                            _control_interface.debug(f"An New Account Register Quest From {msg['data']['path']}")
+                            _control_interface.debug(
+                                f"An New Account Register Quest From {msg['data']['path']}"
+                            )
                         elif msg["status"] == "Connect":
-                            if msg["data"]["account"] == "":
-                                # 为新连接的子服务器生成唯一的 ID
+                            if account == "-----":
+                                from cryptography.fernet import Fernet
+
                                 server_id = self.generate_random_id(5)
                                 while server_id in self.websockets:
                                     server_id = self.generate_random_id(5)
-                            else:
-                                server_id = msg["data"]["account"]
-
-                            self.websockets[server_id] = websocket
-                            self.broadcast_websockets.add(websocket)
-                            self.servers_info[server_id] = msg["data"]
-
-                            from connect_core.plugin.init_plugin import (
-                                new_connect,
-                                connected,
-                            )
-
-                            connected()
-                            new_connect(list(self.servers_info.keys()))
-
-                            _control_interface.info(
-                                _control_interface.tr(
-                                    "net_core.service.connect_websocket"
-                                ).format(f"Server {server_id}")
-                            )
-
-                            # 发送连接成功的确认消息
-                            await self.send(
-                                {
-                                    "s": 1,
-                                    "id": server_id,
-                                    "from": "-----",
-                                    "status": "Connected",
-                                    "data": {},
-                                },
-                                websocket,
-                            )
-
-                            self.broadcast(
-                                {
-                                    "s": 2,
-                                    "id": "all",
-                                    "from": "-----",
-                                    "status": "NewServer",
-                                    "data": {
-                                        "server_list": list(self.servers_info.keys())
+                                password = Fernet.generate_key().decode()
+                                accounts[server_id] = password
+                                _control_interface.save_config("account.json", accounts)
+                                await self.send(
+                                    {
+                                        "s": 1,
+                                        "id": server_id,
+                                        "from": "-----",
+                                        "status": "Registered",
+                                        "data": {"password": password},
                                     },
-                                }
-                            )
+                                    websocket,
+                                    account,
+                                )
+                            else:
+                                server_id = account
+
+                                self.websockets[server_id] = websocket
+                                self.broadcast_websockets.add(websocket)
+                                self.servers_info[server_id] = msg["data"]
+
+                                from connect_core.plugin.init_plugin import (
+                                    new_connect,
+                                    connected,
+                                )
+
+                                connected()
+                                new_connect(list(self.servers_info.keys()))
+
+                                _control_interface.info(
+                                    _control_interface.tr(
+                                        "net_core.service.connect_websocket"
+                                    ).format(f"Server {server_id}")
+                                )
+
+                                # 发送连接成功的确认消息
+                                await self.send(
+                                    {
+                                        "s": 1,
+                                        "id": server_id,
+                                        "from": "-----",
+                                        "status": "Connected",
+                                        "data": {},
+                                    },
+                                    websocket,
+                                    server_id,
+                                )
+
+                                await self.broadcast(
+                                    {
+                                        "s": 2,
+                                        "id": "all",
+                                        "from": "-----",
+                                        "status": "NewServer",
+                                        "data": {
+                                            "server_list": list(
+                                                self.servers_info.keys()
+                                            )
+                                        },
+                                    }
+                                )
 
                     else:
                         await self.parse_msg(msg)
@@ -198,14 +237,16 @@ class WebsocketServer:
             disconnected()
             del_connect(list(self.servers_info.keys()))
 
-            self.broadcast(
-                {
-                    "s": 2,
-                    "id": "all",
-                    "from": "-----",
-                    "status": "DelServer",
-                    "data": {"server_list": list(self.servers_info.keys())},
-                }
+            asyncio.run(
+                self.broadcast(
+                    {
+                        "s": 2,
+                        "id": "all",
+                        "from": "-----",
+                        "status": "DelServer",
+                        "data": {"server_list": list(self.servers_info.keys())},
+                    }
+                )
             )
 
             _control_interface.info(
@@ -223,21 +264,30 @@ class WebsocketServer:
     # =============
     #   Send Data
     # =============
-    async def send(self, data: dict, websocket, encrypt: bool = True) -> None:
+    async def send(self, data: dict, websocket, account: str = None) -> None:
         """
         向指定的 WebSocket 客户端发送消息。
 
         Args:
             data (dict): 要发送的消息内容。
             websocket: 目标 WebSocket 客户端。
-
+            account (str): 目标 WebSocket 客户端ID, 默认为None
         """
-        if encrypt:
-            await websocket.send(aes_encrypt(json.dumps(data).encode()))
+        accounts = _control_interface.get_config("account.json")
+        if account in accounts.keys():
+            await websocket.send(
+                aes_encrypt(json.dumps(data).encode(), accounts[account])
+            )
+        elif account == "-----":
+            from connect_core.account.register_system import get_register_password
+
+            await websocket.send(
+                aes_encrypt(json.dumps(data).encode(), get_register_password())
+            )
         else:
             await websocket.send(json.dumps(data).encode())
 
-    def broadcast(self, data: dict, server_ids: list = []) -> None:
+    async def broadcast(self, data: dict, server_ids: list = []) -> None:
         """
         广播消息到所有已连接的子服务器。
 
@@ -245,10 +295,15 @@ class WebsocketServer:
             msg (dict): 要广播的消息内容。
             server_ids (list): 过滤的服务器ID, 默认为 []。
         """
-        websocket_list = self.broadcast_websockets.copy()
-        for i in server_ids:
-            websocket_list.remove(self.websockets[i])
-        websockets.broadcast(websocket_list, aes_encrypt(json.dumps(data).encode()))
+        accounts = _control_interface.get_config("account.json")
+        websocket_list = list(self.websockets.keys())
+        for server_id in websocket_list:
+            if not server_id in server_ids:
+                await self.send(
+                    data,
+                    self.websockets[server_id],
+                    server_id,
+                )
 
     # ======================
     #   Send Data to Other
@@ -279,9 +334,9 @@ class WebsocketServer:
             "data": data,
         }
         if t_server_id == "all":
-            self.broadcast(msg)
+            await self.broadcast(msg)
         else:
-            await self.send(msg, self.websockets[t_server_id])
+            await self.send(msg, self.websockets[t_server_id], t_server_id)
 
     async def send_file_to_other_server(
         self,
@@ -325,13 +380,13 @@ class WebsocketServer:
                     f"./send_files/{os.path.basename(file_path)}",
                     list(self.servers_info.keys()),
                 ]
-                self.broadcast(msg, except_id)
+                await self.broadcast(msg, except_id)
             else:
                 self.wait_flie_list[file_hash] = [
                     f"./send_files/{os.path.basename(file_path)}",
                     [t_server_id],
                 ]
-                await self.send(msg, self.websockets[t_server_id])
+                await self.send(msg, self.websockets[t_server_id], t_server_id)
         except (IOError, OSError) as e:
             _control_interface.error(f"Copy Error: {e}")
 
@@ -401,7 +456,9 @@ class WebsocketServer:
                         "save_path": data["file"]["save_path"],
                     },
                 }
-                await self.send(msg, self.websockets[data["from"]["id"]])
+                await self.send(
+                    msg, self.websockets[data["from"]["id"]], data["from"]["id"]
+                )
             elif data["status"] == "SendFile":
                 if data["to"]["id"] == "-----":
                     await self.recv_file(data)
@@ -479,7 +536,9 @@ class WebsocketServer:
                     "status": "RecvFile",
                     "file": {"hash": data["file"]["hash"]},
                 }
-                await self.send(msg, self.websockets[data["from"]["id"]])
+                await self.send(
+                    msg, self.websockets[data["from"]["id"]], data["from"]["id"]
+                )
                 os.remove(
                     f"received_files/{os.path.basename(data['file']['file_path'])}"
                 )
@@ -503,7 +562,9 @@ class WebsocketServer:
                         "save_path": data["file"]["save_path"],
                     },
                 }
-                await self.send(msg, self.websockets[data["from"]["id"]])
+                await self.send(
+                    msg, self.websockets[data["from"]["id"]], data["from"]["id"]
+                )
         except (IOError, OSError) as e:
             _control_interface.error(f"Copy Error: {e}")
 

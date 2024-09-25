@@ -13,11 +13,9 @@ def spawn_password():
     """
     生成密钥, 并存储到password中
     """
-    from connect_core.aes_encrypt import aes_main
     global _password
     while True:
         _password = Fernet.generate_key().decode()
-        aes_main(_control_interface, _password)
         _control_interface.debug(f"New Password! {_password}")
         time.sleep(180)
 
@@ -105,6 +103,15 @@ def get_password() -> str:
     }
     data = encode_base64(json.dumps(data))
     return data
+
+
+def get_register_password() -> str:
+    """
+    获取初始化临时密钥
+
+    :return: 密钥字符串
+    """
+    return _password
 
 
 def analyze_password(key: str) -> dict:
