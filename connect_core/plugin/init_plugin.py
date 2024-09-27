@@ -22,6 +22,8 @@ class PluginLoader:
 
     def load_plugins(self):
         """加载插件目录中的所有插件"""
+        if not os.path.exists(self.plugin_dir):
+            os.makedirs(self.plugin_dir)
         for plugin_file in os.listdir(self.plugin_dir):
             if plugin_file.endswith(".mcdr"):
                 self.load_plugin(plugin_file)

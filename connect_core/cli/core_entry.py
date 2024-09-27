@@ -208,11 +208,6 @@ def client() -> None:
     _config = _control_interface.get_config()
 
     _control_interface.info(
-        _control_interface.tr("cli.starting.welcome").format(
-            f"{_config['ip']}:{_config['port']}"
-        )
-    )
-    _control_interface.info(
         _control_interface.tr("cli.starting.welcome_password").format(
             _config["password"]
         )

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from connect_core.interface.control_interface import CoreControlInterface
 
-global _control_interface
+global _control_interface, _respawn_password
 _password = ""
 
 
@@ -13,11 +13,16 @@ def spawn_password():
     """
     生成密钥, 并存储到password中
     """
-    global _password
+    global _password, _respawn_password
+    _respawn_password = False
     while True:
+        i = 0
         _password = Fernet.generate_key().decode()
         _control_interface.debug(f"New Password! {_password}")
-        time.sleep(180)
+        while not _respawn_password and i <= 180:
+            time.sleep(1)
+            i += 1
+        _respawn_password = False
 
 
 def encode_base64(data: str) -> str:
@@ -78,8 +83,6 @@ def register_system_main(control_interface: "CoreControlInterface"):
     global _control_interface
     _control_interface = control_interface
 
-    _control_interface.save_config({}, "account.json")
-
     spawn_password_thread = threading.Thread(target=spawn_password)
     spawn_password_thread.daemon = True
     spawn_password_thread.start()
@@ -91,6 +94,10 @@ def get_password() -> str:
 
     :return str: 密钥字符串
     """
+    _control_interface.info("Wait...")
+    global _respawn_password
+    _respawn_password = True
+    time.sleep(1.2)
     data = {
         "ip": {
             "config": _control_interface.get_config()["ip"],

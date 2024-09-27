@@ -92,18 +92,20 @@ class WebsocketServer:
                     # 解密并解析收到的消息
                     msg = json.loads(msg)
                     account = msg["account"]
-                    accounts = _control_interface.get_config("account.json")
+                    accounts = _control_interface.get_config("account.json").copy()
                     if account != "":
                         if account == "-----":
                             from connect_core.account.register_system import (
                                 get_register_password,
                             )
 
-                            msg = aes_decrypt(
-                                msg["data"], get_register_password()
-                            ).decode()
+                            msg = json.loads(
+                                aes_decrypt(msg["data"], get_register_password())
+                            )
                         elif account in accounts.keys():
-                            msg = aes_decrypt(msg["data"], accounts[account]).decode()
+                            msg = json.loads(
+                                aes_decrypt(msg["data"], accounts[account])
+                            )
                         else:
                             await websocket.close(reason="400")
                             _control_interface.error(f"Unknown Account: {account}")
@@ -116,7 +118,7 @@ class WebsocketServer:
 
                     if msg["s"] == 1:
                         if msg["status"] == "Register":
-                            asyncio.sleep(0.3)
+                            await asyncio.sleep(0.3)
                             await self.send(
                                 {
                                     "s": 1,
@@ -139,7 +141,7 @@ class WebsocketServer:
                                     server_id = self.generate_random_id(5)
                                 password = Fernet.generate_key().decode()
                                 accounts[server_id] = password
-                                _control_interface.save_config("account.json", accounts)
+                                _control_interface.save_config(accounts, "account.json")
                                 await self.send(
                                     {
                                         "s": 1,
@@ -206,7 +208,7 @@ class WebsocketServer:
                     # 处理解密或消息处理时发生的错误
                     _control_interface.debug(f"Error with sub-server connection: {e}")
                     await websocket.close(reason="400")
-                    self.close_connection(server_id, websocket)
+                    await self.close_connection(server_id, websocket)
                     break
 
         except (
@@ -214,9 +216,9 @@ class WebsocketServer:
             websockets.exceptions.ConnectionClosedError,
         ):
             # 处理连接关闭的情况
-            self.close_connection(server_id, websocket)
+            await self.close_connection(server_id, websocket)
 
-    def close_connection(self, server_id: str = None, websocket=None) -> None:
+    async def close_connection(self, server_id: str = None, websocket=None) -> None:
         """
         关闭与子服务器的连接并清理相关数据。
 
@@ -237,16 +239,14 @@ class WebsocketServer:
             disconnected()
             del_connect(list(self.servers_info.keys()))
 
-            asyncio.run(
-                self.broadcast(
-                    {
-                        "s": 2,
-                        "id": "all",
-                        "from": "-----",
-                        "status": "DelServer",
-                        "data": {"server_list": list(self.servers_info.keys())},
-                    }
-                )
+            await self.broadcast(
+                {
+                    "s": 2,
+                    "id": "all",
+                    "from": "-----",
+                    "status": "DelServer",
+                    "data": {"server_list": list(self.servers_info.keys())},
+                }
             )
 
             _control_interface.info(

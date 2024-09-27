@@ -25,12 +25,12 @@ def aes_main(control_interface: "CoreControlInterface", password: str = None):
         _fernet = None
 
 
-def aes_encrypt(data: bytes, password: str = None) -> bytes:
+def aes_encrypt(data: bytes | str, password: str = None) -> bytes:
     """
     加密数据
 
     Args:
-        data (bytes): 需要加密的字节数据。
+        data (bytes | str): 需要加密的字节数据。
         password (str): 密钥, 默认为None
 
     Returns:
@@ -50,12 +50,12 @@ def aes_encrypt(data: bytes, password: str = None) -> bytes:
             raise InvalidToken("Password initialization error!")
 
 
-def aes_decrypt(data: bytes, password: str = None) -> bytes:
+def aes_decrypt(data: bytes | str, password: str = None) -> bytes:
     """
     解密数据
 
     Args:
-        data (bytes): 需要解密的字节数据。
+        data (bytes | str): 需要解密的字节数据。
         password (str): 密钥, 默认为None
 
     Returns:
@@ -69,7 +69,7 @@ def aes_decrypt(data: bytes, password: str = None) -> bytes:
         fernet = Fernet(password.encode())
         if data:
             try:
-                return _fernet.decrypt(data)
+                return fernet.decrypt(data)
             except InvalidToken as e:
                 _control_interface.error(_control_interface.tr("rsa.decrypt_error"))
                 raise InvalidToken(f"Decryption failed: {e}")
@@ -78,7 +78,7 @@ def aes_decrypt(data: bytes, password: str = None) -> bytes:
     else:
         if fernet and data:
             try:
-                return _fernet.decrypt(data)
+                return fernet.decrypt(data)
             except InvalidToken as e:
                 _control_interface.error(_control_interface.tr("rsa.decrypt_error"))
                 raise InvalidToken(f"Decryption failed: {e}")

@@ -27,7 +27,7 @@ def main():
             display_help()
     else:
         # TODO: DEBUG!!!
-        core_entry_init(True)
+        core_entry_init(False)
 
 # Public
 if __name__ == "__main__":

@@ -171,18 +171,19 @@ class WebsocketClient:
 
         Args:
             data (dict): 要发送的消息内容。
+            account (str): 账号, 默认为None
         """
         if account is None:
             account = _control_interface.get_config()["account"]
         if account:
             await self.websocket.send(json.dumps({
                 "account": account,
-                "data": aes_encrypt(json.dumps(data).encode())
+                "data": aes_encrypt(json.dumps(data).encode()).decode()
             }).encode())
         else:
             await self.websocket.send(json.dumps({
                 "account": account,
-                "data": json.dumps(data).encode()
+                "data": data
             }).encode())
 
     # ======================
@@ -257,20 +258,27 @@ class WebsocketClient:
         """
         if data["s"] == 1:
             if data["status"] == "ConnectOK":
-                await self.send({
+                if _control_interface.get_config()["account"] == "":
+                    await self.send({
                     "s": 1,
                     "id": "-----",
                     "status": "Connect",
-                    "data": {"account": _control_interface.get_config()["account"], "path": sys.argv[0]}
-                })
+                    "data": {"path": sys.argv[0]}
+                }, "-----")
+                else:
+                    await self.send({
+                        "s": 1,
+                        "id": "-----",
+                        "status": "Connect",
+                        "data": {"path": sys.argv[0]}
+                    })
             elif data["status"] == "Registered":
-                from connect_core.aes_encrypt import aes_main
-                config = _control_interface.get_config()
-                config["account"] == data["id"]
-                config["password"] == data["data"]["password"]
-                aes_main(_control_interface, data["data"]["password"])
-                self.stop_server()
-                self.start_server()
+                from connect_core.cli.tools import restart_program
+                config = _control_interface.get_config().copy()
+                config["account"] = data["id"]
+                config["password"] = data["data"]["password"]
+                _control_interface.save_config(config)
+                restart_program()
             elif data["status"] == "Connected":
                 os.system(f"title ConnectCore Client {data["id"]}")
                 self.server_id = data["id"]
