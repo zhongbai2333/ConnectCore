@@ -1,9 +1,9 @@
 import sys
 
-from connect_core.cli.core_entry import core_entry_init
+from connect_core.cli.cli_entry import core_entry_init
 
 
-def display_help():
+def _display_help():
     """
     显示CLI系统帮助
     """
@@ -24,10 +24,11 @@ def main():
         elif command == "client":
             core_entry_init(False)
         else:
-            display_help()
+            _display_help()
     else:
         # TODO: DEBUG!!!
         core_entry_init(False)
+
 
 # Public
 if __name__ == "__main__":

@@ -235,9 +235,9 @@ class PluginControlInterface(CoreControlInterface):
         Returns:
             bool: 是/否
         """
-        from connect_core.cli.core_entry import _is_server
+        from connect_core.cli.cli_entry import get_is_server
 
-        return _is_server
+        return get_is_server()
 
     def get_server_id(self) -> str:
         """

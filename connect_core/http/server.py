@@ -21,9 +21,10 @@ def http_main(control_interface: "CoreControlInterface"):
             # 确保路径从send_files目录中获取文件
             file_path = parsed_path.path.replace("/send_files/", "", 1)
             if os.path.isfile(file_path):
+                path, _ = os.path.split(file_path)
                 with open(file_path, "rb") as f:
                     file_data = f.read()
-                encrypted_data = aes_encrypt(file_data)
+                encrypted_data = aes_encrypt(file_data, path)
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
@@ -53,11 +54,15 @@ def http_main(control_interface: "CoreControlInterface"):
                 # 获取上传的文件
                 if "file" in form:
                     field_item = form["file"]
+                    account = form["account"]
                     encrypted_data = field_item.file.read()
 
                     # 解密文件数据
                     try:
-                        file_data = aes_decrypt(encrypted_data)
+                        file_data = aes_decrypt(
+                            encrypted_data,
+                            control_interface.get_config("account.json")[account],
+                        )
                     except Exception as e:
                         self.send_response(400)
                         self.end_headers()

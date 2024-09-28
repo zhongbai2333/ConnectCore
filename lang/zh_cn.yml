@@ -6,7 +6,7 @@ connect_core:
       enter_http_port: "请输入 HTTP 文件服务器端口：[4443] "
       enter_password: "请输入群服务器密钥: [{}] "
       enter_key: "请输入初始化密钥: "
-      finish: "已将配置文件保存至 config.json, 程序将在3秒后重启..."
+      finish: "已将配置文件保存至 config.json"
     starting:
       welcome: "请使用 \"getkey\" 获取子服务器初始化密钥"
       welcome_password: "群组密钥为: {}"

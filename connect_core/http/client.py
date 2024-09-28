@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 def upload_file(
-    control_interface: "CoreControlInterface", url: str, file_path: str
+    control_interface: "CoreControlInterface", url: str, file_path: str, account: str
 ) -> int:
     """
     上传文件到指定URL，并在上传前对文件进行RSA加密。
@@ -25,7 +25,7 @@ def upload_file(
             file_data = file.read()
             encrypted_data = aes_encrypt(file_data)
 
-        files = {"file": (os.path.basename(file_path), encrypted_data)}
+        files = {"file": (os.path.basename(file_path), encrypted_data), "account": account}
         response = requests.post(url, files=files)
 
         return response.status_code

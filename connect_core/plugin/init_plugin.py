@@ -252,3 +252,11 @@ def reload_plugin(sid: str):
         sid (str): 插件ID
     """
     _plugin_loader.reload(sid)
+
+def get_plugins() -> dict:
+    """
+    获取插件列表
+
+    :return: 插件列表
+    """
+    return _plugin_loader.plugins

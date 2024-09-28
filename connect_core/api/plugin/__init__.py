@@ -7,6 +7,7 @@ from connect_core.plugin.init_plugin import (
     recv_file,
     unload_plugin,
     reload_plugin,
+    get_plugins,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "recv_file",
     "unload_plugin",
     "reload_plugin",
+    "get_plugins",
 ]

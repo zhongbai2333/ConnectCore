@@ -21,4 +21,9 @@ __all__ = [
     "get_file_hash",
     "verify_file_hash",
     "append_to_path",
+    "encode_base64",
+    "decode_base64",
+    "get_all_internal_ips",
+    "get_external_ip",
+    "get_plugins",
 ]

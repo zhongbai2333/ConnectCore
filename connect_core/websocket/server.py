@@ -1,9 +1,23 @@
-import random, string, asyncio, websockets, json, shutil, os
+import random
+import string
+import asyncio
+import websockets
+import json
+import shutil
+import os
+from cryptography.fernet import Fernet
 from mcdreforged.api.all import new_thread
-
 from connect_core.mcdr.mcdr_entry import get_mcdr
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
-from connect_core.cli.tools import get_file_hash, verify_file_hash
+from connect_core.tools import get_file_hash, verify_file_hash
+from connect_core.account.register_system import get_register_password
+from connect_core.plugin.init_plugin import (
+    del_connect,
+    disconnected,
+    recv_data,
+    recv_file,
+)
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,49 +27,34 @@ websocket_server, _control_interface = None, None
 
 
 class WebsocketServer:
-    """
-    WebSocket 服务器的主类，负责管理 WebSocket 连接和通信。
-    """
+    """WebSocket 服务器的主类，负责管理 WebSocket 连接和通信。"""
 
     def __init__(self) -> None:
-        """
-        初始化 WebSocket 服务器的基本配置。
-        """
-        _config = _control_interface.get_config()
+        """初始化 WebSocket 服务器的基本配置。"""
+        self._config = _control_interface.get_config()
         self.finish_close = False
-        self.host = _config["ip"]  # 服务器监听的 IP 地址
-        self.port = _config["port"]  # 服务器监听的端口号
-        self.websockets = {}  # 存储已连接的 WebSocket 客户端
-        self.broadcast_websockets = set()  # 需要广播消息的 WebSocket 客户端集合
-        self.servers_info = {}  # 存储已连接的子服务器的信息
-        self.wait_flie_list = {}  # 存储等待下载的文件信息
-        self.wait_register_connect = {}  # 存储等待注册的连接
+        self._host = self._config["ip"]
+        self._port = self._config["port"]
+        self.websockets = {}
+        self.broadcast_websockets = set()
+        self.servers_info = {}
+        self._wait_file_list = {}
+        self._wait_register_connect = {}
 
-    # ===========
-    #   Control
-    # ===========
+    # =========== Control ===========
     def start_server(self) -> None:
-        """
-        启动 WebSocket 服务器。
-        """
-        asyncio.run(self.init_main())
+        """启动 WebSocket 服务器。"""
+        asyncio.run(self._init_main())
 
     def close_server(self) -> None:
-        """
-        关闭 WebSocket 服务器。
-        取消主任务以停止服务器。
-        """
+        """关闭 WebSocket 服务器。"""
         if hasattr(self, "main_task"):
             self.main_task.cancel()
 
-    # ========
-    #   Core
-    # ========
-    async def init_main(self) -> None:
-        """
-        初始化并启动主 WebSocket 服务器任务。
-        """
-        self.main_task = asyncio.create_task(self.main())
+    # ========== Core ==========
+    async def _init_main(self) -> None:
+        """初始化并启动主 WebSocket 服务器任务。"""
+        self.main_task = asyncio.create_task(self._main())
         try:
             await self.main_task
         except asyncio.CancelledError:
@@ -64,168 +63,126 @@ class WebsocketServer:
             )
             self.finish_close = True
 
-    async def main(self) -> None:
-        """
-        WebSocket 服务器的主循环，负责监听连接并处理通信。
-        """
-        async with websockets.serve(self.handler, self.host, self.port):
+    async def _main(self) -> None:
+        """WebSocket 服务器的主循环，负责监听连接并处理通信。"""
+        async with websockets.serve(self._handler, self._host, self._port):
             _control_interface.info(
                 _control_interface.tr("net_core.service.start_websocket")
             )
             await asyncio.Future()  # 阻塞以保持服务器运行
 
-    # ============
-    #   Connect
-    # ============
-    async def handler(self, websocket) -> None:
-        """
-        处理每个 WebSocket 连接的协程，管理消息的接收和响应。
-
-        Args:
-            websocket: 当前连接的 WebSocket 对象。
-        """
+    # ============ Connect ============
+    async def _handler(self, websocket) -> None:
+        """处理每个 WebSocket 连接的协程。"""
         server_id = None
         try:
             while True:
                 msg = await websocket.recv()
-                try:
-                    # 解密并解析收到的消息
-                    msg = json.loads(msg)
-                    account = msg["account"]
-                    accounts = _control_interface.get_config("account.json").copy()
-                    if account != "":
-                        if account == "-----":
-                            from connect_core.account.register_system import (
-                                get_register_password,
-                            )
-
-                            msg = json.loads(
-                                aes_decrypt(msg["data"], get_register_password())
-                            )
-                        elif account in accounts.keys():
-                            msg = json.loads(
-                                aes_decrypt(msg["data"], accounts[account])
-                            )
-                        else:
-                            await websocket.close(reason="400")
-                            _control_interface.error(f"Unknown Account: {account}")
-                            break
-                    else:
-                        msg = msg["data"]
-                    _control_interface.debug(
-                        f"Received data from sub-server {account}: {msg}"
-                    )
-
-                    if msg["s"] == 1:
-                        if msg["status"] == "Register":
-                            await asyncio.sleep(0.3)
-                            await self.send(
-                                {
-                                    "s": 1,
-                                    "id": "",
-                                    "from": "-----",
-                                    "status": "ConnectOK",
-                                    "data": {},
-                                },
-                                websocket,
-                            )
-                            _control_interface.debug(
-                                f"An New Account Register Quest From {msg['data']['path']}"
-                            )
-                        elif msg["status"] == "Connect":
-                            if account == "-----":
-                                from cryptography.fernet import Fernet
-
-                                server_id = self.generate_random_id(5)
-                                while server_id in self.websockets:
-                                    server_id = self.generate_random_id(5)
-                                password = Fernet.generate_key().decode()
-                                accounts[server_id] = password
-                                _control_interface.save_config(accounts, "account.json")
-                                await self.send(
-                                    {
-                                        "s": 1,
-                                        "id": server_id,
-                                        "from": "-----",
-                                        "status": "Registered",
-                                        "data": {"password": password},
-                                    },
-                                    websocket,
-                                    account,
-                                )
-                            else:
-                                server_id = account
-
-                                self.websockets[server_id] = websocket
-                                self.broadcast_websockets.add(websocket)
-                                self.servers_info[server_id] = msg["data"]
-
-                                from connect_core.plugin.init_plugin import (
-                                    new_connect,
-                                    connected,
-                                )
-
-                                connected()
-                                new_connect(list(self.servers_info.keys()))
-
-                                _control_interface.info(
-                                    _control_interface.tr(
-                                        "net_core.service.connect_websocket"
-                                    ).format(f"Server {server_id}")
-                                )
-
-                                # 发送连接成功的确认消息
-                                await self.send(
-                                    {
-                                        "s": 1,
-                                        "id": server_id,
-                                        "from": "-----",
-                                        "status": "Connected",
-                                        "data": {},
-                                    },
-                                    websocket,
-                                    server_id,
-                                )
-
-                                await self.broadcast(
-                                    {
-                                        "s": 2,
-                                        "id": "all",
-                                        "from": "-----",
-                                        "status": "NewServer",
-                                        "data": {
-                                            "server_list": list(
-                                                self.servers_info.keys()
-                                            )
-                                        },
-                                    }
-                                )
-
-                    else:
-                        await self.parse_msg(msg)
-
-                except Exception as e:
-                    # 处理解密或消息处理时发生的错误
-                    _control_interface.debug(f"Error with sub-server connection: {e}")
-                    await websocket.close(reason="400")
-                    await self.close_connection(server_id, websocket)
-                    break
+                await self._process_message(msg, websocket, server_id)
 
         except (
             websockets.exceptions.ConnectionClosedOK,
             websockets.exceptions.ConnectionClosedError,
         ):
-            # 处理连接关闭的情况
-            await self.close_connection(server_id, websocket)
+            await self._close_connection(server_id, websocket)
 
-    async def close_connection(self, server_id: str = None, websocket=None) -> None:
-        """
-        关闭与子服务器的连接并清理相关数据。
+    async def _process_message(self, msg: str, websocket, server_id: str) -> None:
+        """处理接收到的消息并进行响应。"""
+        try:
+            msg = json.loads(msg)
+            account = msg["account"]
+            accounts = _control_interface.get_config("account.json").copy()
+            msg_data = self._decrypt_message(msg, account, accounts)
 
-        Args:
-            server_id (str, optional): 要关闭的子服务器 ID。默认为 None。
-            websocket (optional): 要关闭的 WebSocket 对象。默认为 None。
-        """
+            if msg_data["s"] == 1:
+                await self._handle_connection(msg_data, websocket, account)
+            else:
+                await self._parse_msg(msg_data)
+
+        except Exception as e:
+            _control_interface.debug(f"Error with sub-server connection: {e}")
+            await websocket.close(reason="400")
+            await self._close_connection(server_id, websocket)
+
+    def _decrypt_message(self, msg: dict, account: str, accounts: dict) -> dict:
+        """解密消息并返回解密后的数据。"""
+        if account == "-----":
+            msg = json.loads(aes_decrypt(msg["data"], get_register_password()))
+        elif account in accounts:
+            msg = json.loads(aes_decrypt(msg["data"], accounts[account]))
+        else:
+            raise ValueError(f"Unknown Account: {account}")
+        return msg
+
+    async def _handle_connection(self, msg: dict, websocket, account: str) -> None:
+        """处理新连接或注册请求。"""
+        if msg["status"] == "Register":
+            await self._register_account(websocket)
+        elif msg["status"] == "Connect":
+            await self._connect_account(websocket, account, msg)
+
+    async def _register_account(self, websocket) -> None:
+        """处理账户注册。"""
+        await asyncio.sleep(0.3)
+        await self._send(
+            {"s": 1, "id": "", "from": "-----", "status": "ConnectOK", "data": {}},
+            websocket,
+        )
+
+    async def _connect_account(self, websocket, account: str, msg: dict) -> None:
+        """处理账户连接。"""
+        if account == "-----":
+            server_id = self._generate_random_id(5)
+            while server_id in self.websockets:
+                server_id = self._generate_random_id(5)
+            password = Fernet.generate_key().decode()
+            accounts = _control_interface.get_config("account.json")
+            accounts[server_id] = password
+            _control_interface.save_config(accounts, "account.json")
+            await self._send(
+                {
+                    "s": 1,
+                    "id": server_id,
+                    "from": "-----",
+                    "status": "Registered",
+                    "data": {"password": password},
+                },
+                websocket,
+                account,
+            )
+        else:
+            server_id = account
+            self.websockets[server_id] = websocket
+            self.broadcast_websockets.add(websocket)
+            self.servers_info[server_id] = msg["data"]
+            _control_interface.info(
+                _control_interface.tr("net_core.service.connect_websocket").format(
+                    f"Server {server_id}"
+                )
+            )
+            await self._send(
+                {
+                    "s": 1,
+                    "id": server_id,
+                    "from": "-----",
+                    "status": "Connected",
+                    "data": {},
+                },
+                websocket,
+                server_id,
+            )
+            await self._broadcast(
+                {
+                    "s": 2,
+                    "id": "all",
+                    "from": "-----",
+                    "status": "NewServer",
+                    "data": {"server_list": list(self.servers_info.keys())},
+                }
+            )
+
+    async def _close_connection(self, server_id: str = None, websocket=None) -> None:
+        """关闭与子服务器的连接并清理相关数据。"""
         if server_id and websocket:
             if server_id in self.websockets:
                 del self.websockets[server_id]
@@ -234,12 +191,10 @@ class WebsocketServer:
             if websocket in self.broadcast_websockets:
                 self.broadcast_websockets.remove(websocket)
 
-            from connect_core.plugin.init_plugin import del_connect, disconnected
-
             disconnected()
             del_connect(list(self.servers_info.keys()))
 
-            await self.broadcast(
+            await self._broadcast(
                 {
                     "s": 2,
                     "id": "all",
@@ -248,7 +203,6 @@ class WebsocketServer:
                     "data": {"server_list": list(self.servers_info.keys())},
                 }
             )
-
             _control_interface.info(
                 _control_interface.tr(
                     "net_core.service.disconnect_from_sub_websocket"
@@ -261,53 +215,27 @@ class WebsocketServer:
                 )
             )
 
-    # =============
-    #   Send Data
-    # =============
-    async def send(self, data: dict, websocket, account: str = None) -> None:
-        """
-        向指定的 WebSocket 客户端发送消息。
-
-        Args:
-            data (dict): 要发送的消息内容。
-            websocket: 目标 WebSocket 客户端。
-            account (str): 目标 WebSocket 客户端ID, 默认为None
-        """
+    # ============ Send Data ============
+    async def _send(self, data: dict, websocket, account: str = None) -> None:
+        """向指定的 WebSocket 客户端发送消息。"""
         accounts = _control_interface.get_config("account.json")
-        if account in accounts.keys():
+        if account in accounts:
             await websocket.send(
                 aes_encrypt(json.dumps(data).encode(), accounts[account])
             )
         elif account == "-----":
-            from connect_core.account.register_system import get_register_password
-
             await websocket.send(
                 aes_encrypt(json.dumps(data).encode(), get_register_password())
             )
         else:
             await websocket.send(json.dumps(data).encode())
 
-    async def broadcast(self, data: dict, server_ids: list = []) -> None:
-        """
-        广播消息到所有已连接的子服务器。
+    async def _broadcast(self, data: dict, server_ids: list = []) -> None:
+        """广播消息到所有已连接的子服务器。"""
+        for server_id in self.websockets.keys():
+            if server_id not in server_ids:
+                await self._send(data, self.websockets[server_id], server_id)
 
-        Args:
-            msg (dict): 要广播的消息内容。
-            server_ids (list): 过滤的服务器ID, 默认为 []。
-        """
-        accounts = _control_interface.get_config("account.json")
-        websocket_list = list(self.websockets.keys())
-        for server_id in websocket_list:
-            if not server_id in server_ids:
-                await self.send(
-                    data,
-                    self.websockets[server_id],
-                    server_id,
-                )
-
-    # ======================
-    #   Send Data to Other
-    # ======================
     async def send_data_to_other_server(
         self,
         f_server_id: str,
@@ -316,16 +244,7 @@ class WebsocketServer:
         t_plugin_id: str,
         data: dict,
     ) -> None:
-        """
-        发送消息到指定的子服务器。
-
-        Args:
-            f_server_id (str): 服务器的唯一标识符
-            f_plugin_id (str): 插件的唯一标识符
-            t_server_id (str): 子服务器的唯一标识符
-            t_plugin_id (str): 子服务器插件的唯一标识符
-            data (dict): 要发送的消息内容。
-        """
+        """发送消息到指定的子服务器。"""
         msg = {
             "s": 0,
             "to": {"id": t_server_id, "pluginid": t_plugin_id},
@@ -334,9 +253,9 @@ class WebsocketServer:
             "data": data,
         }
         if t_server_id == "all":
-            await self.broadcast(msg)
+            await self._broadcast(msg)
         else:
-            await self.send(msg, self.websockets[t_server_id], t_server_id)
+            await self._send(msg, self.websockets[t_server_id], t_server_id)
 
     async def send_file_to_other_server(
         self,
@@ -348,63 +267,35 @@ class WebsocketServer:
         save_path: str,
         except_id: list = [],
     ) -> None:
-        """
-        发送文件到指定的子服务器。
-
-        Args:
-            f_server_id (str): 服务器的唯一标识符
-            f_plugin_id (str): 插件的唯一标识符
-            t_server_id (str): 子服务器的唯一标识符
-            t_plugin_id (str): 子服务器插件的唯一标识符
-            file_path (str): 要发送的文件目录。
-            save_path (str): 要保存的位置。
-        """
+        """发送文件到指定的子服务器。"""
         try:
-            # 复制文件
             shutil.copy(file_path, "./send_files/")
             file_hash = get_file_hash(file_path)
-            config = _control_interface.get_config()
             msg = {
                 "s": 0,
                 "to": {"id": t_server_id, "pluginid": t_plugin_id},
                 "from": {"id": f_server_id, "pluginid": f_plugin_id},
                 "status": "SendFile",
                 "file": {
-                    "path": f"http://{config['ip']}:{config['http_port']}/send_files/{os.path.basename(file_path)}",
+                    "path": f"http://{self.config['ip']}:{self.config['http_port']}/send_files/{os.path.basename(file_path)}",
+                    "file_path": os.path.basename(file_path),
                     "hash": file_hash,
                     "save_path": save_path,
                 },
             }
             if t_server_id == "all":
-                self.wait_flie_list[file_hash] = [
-                    f"./send_files/{os.path.basename(file_path)}",
-                    list(self.servers_info.keys()),
-                ]
-                await self.broadcast(msg, except_id)
+                await self._broadcast(msg, except_id)
             else:
-                self.wait_flie_list[file_hash] = [
-                    f"./send_files/{os.path.basename(file_path)}",
-                    [t_server_id],
-                ]
-                await self.send(msg, self.websockets[t_server_id], t_server_id)
-        except (IOError, OSError) as e:
-            _control_interface.error(f"Copy Error: {e}")
+                await self._send(msg, self.websockets[t_server_id], t_server_id)
+        except Exception as e:
+            _control_interface.error(f"Send File Error: {e}")
 
-    # =============
-    #   Parse Msg
-    # =============
-    async def parse_msg(self, data: dict):
-        """
-        解析并处理从子服务器接收到的消息。
-
-        Args:
-            msg (dict): 从服务器接收到的消息内容。
-        """
+    # ============= Parse Msg ============
+    async def _parse_msg(self, data: dict):
+        """解析并处理从子服务器接收到的消息。"""
         if data["s"] == 0:
             if data["status"] == "SendData":
                 if data["to"]["id"] == "-----":
-                    from connect_core.plugin.init_plugin import recv_data
-
                     recv_data(data["to"]["pluginid"], data["data"])
                 elif data["to"]["id"] == "all":
                     await self.send_data_to_other_server(
@@ -414,8 +305,6 @@ class WebsocketServer:
                         data["to"]["pluginid"],
                         data["data"],
                     )
-                    from connect_core.plugin.init_plugin import recv_data
-
                     recv_data(data["to"]["pluginid"], data["data"])
                 else:
                     await self.send_data_to_other_server(
@@ -427,17 +316,16 @@ class WebsocketServer:
                     )
             elif data["status"] == "RecvFile":
                 file_hash = data["file"]["hash"]
-                self.wait_flie_list[file_hash][1].remove(data["from"]["id"])
+                self._wait_file_list[file_hash][1].remove(data["from"]["id"])
                 _control_interface.info(
                     _control_interface.tr(
                         "net_core.service.sub_server_download_finish"
                     ).format(data["from"]["id"])
                 )
-                if not self.wait_flie_list[file_hash][1]:
-                    os.remove(self.wait_flie_list[file_hash][0])
-                    del self.wait_flie_list[file_hash]
+                if not self._wait_file_list[file_hash][1]:
+                    os.remove(self._wait_file_list[file_hash][0])
+                    del self._wait_file_list[file_hash]
             elif data["status"] == "RequestSendFile":
-                config = _control_interface.get_config()
                 msg = {
                     "s": 0,
                     "to": {
@@ -450,25 +338,21 @@ class WebsocketServer:
                     },
                     "status": "SendFileOK",
                     "file": {
-                        "path": f"http://{config['ip']}:{config['http_port']}",
+                        "path": f"http://{self.config['ip']}:{self.config['http_port']}",
                         "file_path": data["file"]["file_path"],
                         "hash": data["file"]["hash"],
                         "save_path": data["file"]["save_path"],
                     },
                 }
-                await self.send(
+                await self._send(
                     msg, self.websockets[data["from"]["id"]], data["from"]["id"]
                 )
             elif data["status"] == "SendFile":
                 if data["to"]["id"] == "-----":
-                    await self.recv_file(data)
-                    from connect_core.plugin.init_plugin import recv_file
-
+                    await self._recv_file(data)
                     recv_file(data["to"]["pluginid"], data["file"]["save_path"])
                 elif data["to"]["id"] == "all":
-                    await self.recv_file(data)
-                    from connect_core.plugin.init_plugin import recv_file
-
+                    await self._recv_file(data)
                     recv_file(data["to"]["pluginid"], data["file"]["save_path"])
                     await self.send_file_to_other_server(
                         data["from"]["id"],
@@ -492,19 +376,9 @@ class WebsocketServer:
                         f"received_files/{os.path.basename(data['file']['file_path'])}"
                     )
 
-    # ==========
-    #   Tools
-    # ==========
-    def generate_random_id(self, n: int) -> str:
-        """
-        生成指定长度的随机字符串，包含字母和数字。
-
-        Args:
-            n (int): 生成的字符串长度。
-
-        Returns:
-            str: 生成的随机字符串。
-        """
+    # ========== Tools ==========
+    def _generate_random_id(self, n: int) -> str:
+        """生成指定长度的随机字符串，包含字母和数字。"""
         numeric_part = "".join(
             [str(random.randint(0, 9)) for _ in range(random.randint(1, n))]
         )
@@ -513,10 +387,8 @@ class WebsocketServer:
         )
         return "".join(random.sample(list(numeric_part + alpha_part), n))
 
-    async def recv_file(self, data: dict):
-        """
-        服务器接收文件
-        """
+    async def _recv_file(self, data: dict):
+        """服务器接收文件"""
         try:
             shutil.copy(
                 f"received_files/{os.path.basename(data['file']['file_path'])}",
@@ -536,14 +408,13 @@ class WebsocketServer:
                     "status": "RecvFile",
                     "file": {"hash": data["file"]["hash"]},
                 }
-                await self.send(
+                await self._send(
                     msg, self.websockets[data["from"]["id"]], data["from"]["id"]
                 )
                 os.remove(
                     f"received_files/{os.path.basename(data['file']['file_path'])}"
                 )
             else:
-                config = _control_interface.get_config()
                 msg = {
                     "s": 0,
                     "to": {
@@ -556,13 +427,13 @@ class WebsocketServer:
                     },
                     "status": "SendFileOK",
                     "file": {
-                        "path": f"http://{config['ip']}:{config['http_port']}",
+                        "path": f"http://{self.config['ip']}:{self.config['http_port']}",
                         "file_path": data["file"]["file_path"],
                         "hash": data["file"]["hash"],
                         "save_path": data["file"]["save_path"],
                     },
                 }
-                await self.send(
+                await self._send(
                     msg, self.websockets[data["from"]["id"]], data["from"]["id"]
                 )
         except (IOError, OSError) as e:
@@ -571,10 +442,7 @@ class WebsocketServer:
 
 @new_thread("Websocket_Server")
 def start_mcdr_server() -> None:
-    """
-    启用 MCDR 多线程启动 WebSocket 服务器。
-    仅在 MCDR 环境下调用。
-    """
+    """启用 MCDR 多线程启动 WebSocket 服务器。仅在 MCDR 环境下调用。"""
     global websocket_server
     websocket_server = WebsocketServer()
     websocket_server.start_server()
@@ -582,12 +450,8 @@ def start_mcdr_server() -> None:
 
 # public
 def websocket_server_main(control_interface: "CoreControlInterface"):
-    """
-    初始化 WebSocket 服务器。
-    根据环境选择启动 MCDR 多线程服务器或普通服务器。
-    """
+    """初始化 WebSocket 服务器。根据环境选择启动 MCDR 多线程服务器或普通服务器。"""
     global _control_interface
-
     _control_interface = control_interface
     if get_mcdr():
         start_mcdr_server()
@@ -600,16 +464,7 @@ def websocket_server_main(control_interface: "CoreControlInterface"):
 def send_data(
     f_server_id: str, f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict
 ) -> None:
-    """
-    发送消息到指定的子服务器。
-
-    Args:
-        f_server_id (str): 服务器的唯一标识符
-        f_plugin_id (str): 插件的唯一标识符
-        t_server_id (str): 子服务器的唯一标识符
-        t_plugin_id (str): 子服务器插件的唯一标识符
-        data (dict): 要发送的消息内容。
-    """
+    """发送消息到指定的子服务器。"""
     asyncio.run(
         websocket_server.send_data_to_other_server(
             f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
@@ -625,17 +480,7 @@ def send_file(
     file_path: str,
     save_path: str,
 ) -> None:
-    """
-    发送文件到指定的子服务器。
-
-    Args:
-        f_server_id (str): 服务器的唯一标识符
-        f_plugin_id (str): 插件的唯一标识符
-        t_server_id (str): 子服务器的唯一标识符
-        t_plugin_id (str): 子服务器插件的唯一标识符
-        file_path (str): 要发送的文件目录。
-        save_path (str): 要保存的位置。
-    """
+    """发送文件到指定的子服务器。"""
     asyncio.run(
         websocket_server.send_file_to_other_server(
             f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
