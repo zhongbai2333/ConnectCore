@@ -9,12 +9,14 @@ from connect_core.plugin.init_plugin import get_plugins
 from connect_core.interface.control_interface import CoreControlInterface
 from connect_core.account.register_system import register_system_main, get_password
 
-_control_interface = CoreControlInterface()
-_config = _control_interface.get_config()
+global _control_interface, _config
 
 
 class Server(object):
     def __init__(self) -> None:
+        global _control_interface, _config
+        _control_interface = CoreControlInterface()
+        _config = _control_interface.get_config()
         _control_interface.info(_control_interface.tr("cli.starting.welcome"))
         register_system_main(_control_interface)
         init_plugin_main(_control_interface)
@@ -73,6 +75,9 @@ class Server(object):
 
 class Client(object):
     def __init__(self) -> None:
+        global _control_interface, _config
+        _control_interface = CoreControlInterface()
+        _config = _control_interface.get_config()
         _control_interface.info(
             _control_interface.tr("cli.starting.welcome_password").format(
                 _config["password"]

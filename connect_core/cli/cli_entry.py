@@ -1,9 +1,11 @@
+import os
 import sys
 import time
 import requests
 from connect_core.storage import YmlLanguage, JsonDataEditor
 from connect_core.account.login_system import analyze_password
 from connect_core.cli.cli_core import Server, Client
+from connect_core.tools import restart_program
 
 _is_server = False
 
@@ -98,7 +100,9 @@ def core_entry_init(is_server: bool) -> None:
     global _is_server
     _is_server = is_server
     # 初始化
-    _initialization_config()
+    if not os.path.exists("config.json"):
+        _initialization_config()
+        restart_program()
     # 获取控制接口
     if is_server:
         server = Server()

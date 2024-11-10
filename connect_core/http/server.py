@@ -2,7 +2,7 @@ import http.server
 from socketserver import ThreadingMixIn
 import os
 from urllib.parse import urlparse
-import cgi
+from email import parser, policy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,15 +41,23 @@ def http_main(control_interface: "CoreControlInterface"):
                 self.wfile.write(b"File not found")
 
         def do_POST(self):
-            content_type, pdict = cgi.parse_header(self.headers["Content-Type"])
-            if content_type == "multipart/form-data":
-                pdict["boundary"] = bytes(pdict["boundary"], "utf-8")
-                form = cgi.FieldStorage(
-                    fp=self.rfile,
-                    headers=self.headers,
-                    environ={"REQUEST_METHOD": "POST"},
-                    keep_blank_values=True,
+            content_type = self.headers["Content-Type"]
+            if content_type.startswith("multipart/form-data"):
+                boundary = content_type.split("boundary=")[-1].encode("utf-8")
+                content_length = int(self.headers["Content-Length"])
+                raw_data = self.rfile.read(content_length)
+
+                # 使用 email.parser 模块解析表单数据
+                message = parser.BytesParser(policy=policy.default).parsebytes(
+                    b"Content-Type: " + content_type.encode("utf-8") + b"\r\n\r\n" + raw_data
                 )
+
+                form = {}
+                for part in message.iter_parts():
+                    if part.get_content_disposition() == "form-data":
+                        name = part.get_param("name", header="content-disposition")
+                        if name:
+                            form[name] = part.get_payload(decode=True).decode(part.get_content_charset() or "utf-8")
 
                 # 获取上传的文件
                 if "file" in form:
