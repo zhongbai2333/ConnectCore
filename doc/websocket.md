@@ -2,6 +2,7 @@
 
 ```json
 {
+    "s": sID,                   // 数据包编号，确认数据发送正确
     "type": typeID,             // 数据包类型标识符，定义见下文。
     "status": StatusID,         // 当前数据包的状态码，定义见下文。
     "to": {
@@ -22,23 +23,29 @@
 
 ## 数据包类型及状态定义
 
-### [0] Control 数据包
+### [0] Basic 数据包
+
+- `status`:
+  - `[0] Test` - 测试连接。
+  - `[1] Ping` - Ping数据包。
+  - `[2] Pong` - Pong数据包。
+
+### [1] Control 数据包
 
 - `Status`:
   - `[0] Stop` - 请求关闭连接或停止服务。
   - `[1] Reload` - 请求重载服务配置或模块。
   - `[2] Maintenance` - 进入维护状态，部分服务受限。
   - `[3] Resume` - 从维护状态恢复到正常服务。
-  - `[-1] test` - 测试连接。
 
-### [1] Register 数据包
+### [2] Register 数据包
 
 - `Status`:
   - `[0] Register` - 客户端请求注册操作。
   - `[1] FinishRegister` - 服务器确认完成注册。
   - `[2] RegisterError` - 注册失败，提供错误详情。
 
-### [2] Login 数据包
+### [3] Login 数据包
 
 - `Status`:
   - `[0] Login` - 客户端请求登录操作。
@@ -47,7 +54,7 @@
   - `[3] DelLogin` - 服务器有新的登出。
   - `[4] LoginError` - 登录失败，提供错误详情。
 
-### [3] Data 数据包
+### [4] Data 数据包
 
 - `Status`:
   - `[0] Send` - 请求发送数据。
@@ -55,7 +62,7 @@
   - `[2] DataError` - 数据传输失败，提供错误详情。
   - `[3] DataPending` - 数据正在处理，需等待完成。
 
-### [4] File 数据包
+### [5] File 数据包
 
 - `Status`:
   - `[0] Send` - 请求发送文件。

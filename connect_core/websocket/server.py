@@ -80,10 +80,7 @@ class WebsocketServer:
                 msg = await websocket.recv()
                 await self._process_message(msg, websocket, server_id)
 
-        except (
-            websockets.exceptions.ConnectionClosedOK,
-            websockets.exceptions.ConnectionClosedError,
-        ):
+        except websockets.exceptions.ConnectionClosed:
             await self._close_connection(server_id, websocket)
 
     async def _process_message(self, msg: str, websocket, server_id: str) -> None:
