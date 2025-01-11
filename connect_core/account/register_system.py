@@ -1,9 +1,9 @@
 import time
-import threading
 import json
 from cryptography.fernet import Fernet
 
 from typing import TYPE_CHECKING
+from connect_core.tools import new_thread
 from connect_core.tools import (
     encode_base64,
     get_all_internal_ips,
@@ -17,6 +17,7 @@ global _control_interface, _respawn_password
 _password = ""
 
 
+@new_thread("RegisterSystem")
 def _spawn_password():
     """
     生成密钥, 并存储到password中
@@ -44,9 +45,7 @@ def register_system_main(control_interface: "CoreControlInterface"):
     global _control_interface
     _control_interface = control_interface
 
-    spawn_password_thread = threading.Thread(target=_spawn_password)
-    spawn_password_thread.daemon = True
-    spawn_password_thread.start()
+    _spawn_password()
 
 
 def get_password() -> str:
@@ -66,7 +65,6 @@ def get_password() -> str:
             "outside": get_external_ip(),
         },
         "port": _control_interface.get_config()["port"],
-        "http_port": _control_interface.get_config()["http_port"],
         "password": _password,
     }
     data = encode_base64(json.dumps(data))

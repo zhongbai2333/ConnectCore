@@ -3,16 +3,10 @@ import sys
 import time
 import json
 import asyncio
-import threading
-from typing import TYPE_CHECKING
-
 import websockets
-from mcdreforged.api.all import new_thread
-
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
-from connect_core.tools import verify_file_hash, get_file_hash, restart_program
-from connect_core.http.client import download_file, upload_file
-from connect_core.mcdr.mcdr_entry import get_mcdr
+from connect_core.tools import restart_program, new_thread, auto_trigger
+from connect_core.websocket.data_packet import DataPacket
 from connect_core.plugin.init_plugin import (
     new_connect,
     del_connect,
@@ -21,17 +15,20 @@ from connect_core.plugin.init_plugin import (
     recv_data,
     recv_file,
 )
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from connect_core.interface.control_interface import CoreControlInterface
 
+_control_interface = None
 
-class WebsocketClient:
+
+class WebsocketClient(object):
     """
     WebSocket 客户端的主类，负责与服务器建立连接、发送和接收消息。
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         """
         初始化 WebSocket 客户端的基本配置。
         """
@@ -43,7 +40,12 @@ class WebsocketClient:
         self._main_task = None  # 主任务协程
         self._receive_task = None  # 接收任务协程
         self.server_id = None  # 服务器 ID
+        self.sid = 2  # 数据包编号
         self.server_list = []  # 服务器列表
+        self.last_data_packet = None  # 上一个发送的一个数据包
+        self.data_packet = DataPacket()  # 数据包处理类
+        self.trigger_websocket_client = None  # 触发器
+        self._wait_file = None  # 等待接收的文件
 
     # ===========
     #   Control
@@ -59,6 +61,8 @@ class WebsocketClient:
         停止 WebSocket 客户端。
         如果接收任务正在运行，则取消该任务，否则取消主任务。
         """
+        if self.trigger_websocket_client:
+            self.trigger_websocket_client.stop()
         if self._receive_task:
             self._receive_task.cancel()
         else:
@@ -145,12 +149,22 @@ class WebsocketClient:
         初始连接时会向服务器发送连接状态消息。
         """
         if self._config["account"]:
-            await self._send( 
-                {"s": 1, "id": "-----", "status": "Connect", "data": {"path": sys.argv[0]}}
+            await self._send(
+                self.data_packet.get_data_packet(
+                    self.data_packet.TYPE_LOGIN,
+                    self.data_packet.DEFAULT_SERVER,
+                    (self._config["account"], "system"),
+                    {"path": sys.argv[0]},
+                )
             )
         else:
             await self._send(
-                {"s": 1, "id": "-----", "status": "Register", "data": {"path": sys.argv[0]}}
+                self.data_packet.get_data_packet(
+                    self.data_packet.TYPE_REGISTER,
+                    self.data_packet.DEFAULT_SERVER,
+                    self.data_packet.DEFAULT_TO_FROM,
+                    {"path": sys.argv[0]},
+                )
             )
         while True:
             self._receive_task = asyncio.create_task(self._get_recv())
@@ -176,7 +190,9 @@ class WebsocketClient:
     # ============
     #   Send Msg
     # ============
-    async def _send(self, data: dict, account: str = None) -> None:
+    async def _send(
+        self, data: dict, from_data_pack: bool = True, account: str = None
+    ) -> None:
         """
         向服务器发送消息。
 
@@ -184,23 +200,46 @@ class WebsocketClient:
             data (dict): 要发送的消息内容。
             account (str): 账号, 默认为None
         """
+        if from_data_pack:
+            data = data["-----"]
         if account is None:
             account = self._config["account"]
+        _control_interface.debug(
+            f"[S][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
+        )
         if account:
-            await self.websocket.send(json.dumps({
-                "account": account,
-                "data": aes_encrypt(json.dumps(data).encode()).decode()
-            }).encode())
+            await self.websocket.send(
+                json.dumps(
+                    {
+                        "account": account,
+                        "data": aes_encrypt(json.dumps(data).encode()).decode(),
+                    }
+                ).encode()
+            )
         else:
-            await self.websocket.send(json.dumps({
-                "account": account,
-                "data": data
-            }).encode())
+            await self.websocket.send(
+                json.dumps({"account": account, "data": data}).encode()
+            )
+
+    async def _trigger_websocket_client(self) -> None:
+        # 如果有上一个数据包，则发送上一个数据包
+        if self.last_data_packet:
+            await self._send(self.last_data_packet, False)
+        await self._send(
+            self.data_packet.get_data_packet(
+                self.sid,
+                self.data_packet.TYPE_PING,
+                self.data_packet.DEFAULT_SERVER,
+                (self.server_id, "system"),
+                None,
+            )
+        )
+        await asyncio.sleep(30)
 
     # ======================
     #   Send Data to Other
     # ======================
-    def send_data_to_other_server(
+    async def send_data_to_other_server(
         self,
         f_plugin_id: str,
         t_server_id: str,
@@ -211,22 +250,21 @@ class WebsocketClient:
         发送消息到指定的子服务器。
 
         Args:
-            f_server_id (str): 服务器的唯一标识符
             f_plugin_id (str): 插件的唯一标识符
             t_server_id (str): 子服务器的唯一标识符
             t_plugin_id (str): 子服务器插件的唯一标识符
             data (dict): 要发送的消息内容。
         """
-        msg = {
-            "s": 0,
-            "to": {"id": t_server_id, "pluginid": t_plugin_id},
-            "from": {"id": self.server_id, "pluginid": f_plugin_id},
-            "status": "SendData",
-            "data": data,
-        }
-        asyncio.run(self._send(msg))
+        msg = self.data_packet.get_data_packet(
+            self.data_packet.TYPE_DATA_SEND,
+            (t_server_id, t_plugin_id),
+            (self.server_id, f_plugin_id),
+            data,
+        )
+        self.last_data_packet = msg
+        await self._send(msg)
 
-    def send_file_to_other_server(
+    async def send_file_to_other_server(
         self,
         f_plugin_id: str,
         t_server_id: str,
@@ -238,23 +276,61 @@ class WebsocketClient:
         发送文件到指定的子服务器。
 
         Args:
-            f_server_id (str): 服务器的唯一标识符
             f_plugin_id (str): 插件的唯一标识符
             t_server_id (str): 子服务器的唯一标识符
             t_plugin_id (str): 子服务器插件的唯一标识符
             file_path (str): 要发送的文件目录。
             save_path (str): 要保存的位置。
         """
-        file_hash = get_file_hash(file_path)
-        msg = {
-            "s": 0,
-            "to": {"id": t_server_id, "pluginid": t_plugin_id},
-            "from": {"id": self.server_id, "pluginid": f_plugin_id},
-            "status": "RequestSendFile",
-            "file": {"hash": file_hash, "file_path": file_path, "save_path": save_path},
-        }
-        asyncio.run(self._send(msg))
-
+        try:
+            file_hash = self.data_packet.get_file_hash(file_path)
+            if os.path.basename(file_path) != os.path.basename(save_path):
+                save_path = os.path.join(file_path, os.path.basename(file_path))
+            await self._send(
+                self.data_packet.get_data_packet(
+                    self.data_packet.TYPE_FILE_SEND,
+                    (t_server_id, t_plugin_id),
+                    (self.server_id, f_plugin_id),
+                    {
+                        "file_name": file_path,
+                        "save_path": save_path,
+                        "hash": file_hash,
+                    },
+                ),
+                self.websockets[t_server_id],
+                t_server_id,
+            )
+            # 读取文件并分块发送数据
+            with open(file_path, "rb") as file:
+                chunk_size = 1024 * 1024  # 每次发送 1 MB
+                while chunk := file.read(chunk_size):
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_FILE_SENDING,
+                            (t_server_id, t_plugin_id),
+                            (self.server_id, f_plugin_id),
+                            {"file": chunk},
+                        ),
+                        self.websockets[t_server_id],
+                        t_server_id,
+                    )
+                    await asyncio.sleep(0.1)  # 控制发送间隔（可选）
+            await self._send(
+                self.data_packet.get_data_packet(
+                    self.data_packet.TYPE_FILE_SENDOK,
+                    (t_server_id, t_plugin_id),
+                    (self.server_id, f_plugin_id),
+                    {
+                        "file_name": file_path,
+                        "save_path": save_path,
+                        "hash": file_hash,
+                    },
+                ),
+                self.websockets[t_server_id],
+                t_server_id,
+            )
+        except Exception as e:
+            _control_interface.error(f"Send File Error: {e}")
 
     # =============
     #   Parse Msg
@@ -265,95 +341,182 @@ class WebsocketClient:
         如果消息中包含服务器 ID，则更新客户端的服务器 ID。
 
         Args:
-            msg (dict): 从服务器接收到的消息内容。
+            data (dict): 从服务器接收到的消息内容。
         """
-        if data["s"] == 1:
-            if data["status"] == "ConnectOK":
-                if self._config["account"] == "":
-                    await self._send({
-                    "s": 1,
-                    "id": "-----",
-                    "status": "Connect",
-                    "data": {"path": sys.argv[0]}
-                }, "-----")
+        data_type = list(data["type"])
+        self.data_packet.add_recv_packet("-----", data)
+        _control_interface.debug(
+            f"[R][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
+        )
+        match data_type:
+            # Control 数据包
+            case self.data_packet.TYPE_CONTROL_STOP:
+                pass
+
+            # Register 数据包
+            case self.data_packet.TYPE_REGISTERED:
+                if self.data_packet.verify_md5_checksum(
+                    data["data"]["payload"], data["data"]["checksum"]
+                ):
+                    self._config["account"] = data["to"][0]
+                    self._config["password"] = data["data"]["payload"]["password"]
+                    _control_interface.save_config(self._config)
+                    restart_program()
                 else:
-                    await self._send({
-                        "s": 1,
-                        "id": "-----",
-                        "status": "Connect",
-                        "data": {"path": sys.argv[0]}
-                    })
-            elif data["status"] == "Registered":
-                self._config["account"] = data["id"]
-                self._config["password"] = data["data"]["password"]
-                _control_interface.save_config(self._config)
-                restart_program()
-            elif data["status"] == "Connected":
-                os.system(f"title ConnectCore Client {data["id"]}")
-                self.server_id = data["id"]
-        elif data["s"] == 2:
-            if data["status"] == "NewServer":
-                new_connect(data["data"]["server_list"])
-            else:
-                del_connect(data["data"]["server_list"])
-        elif data["s"] == 0:
-            if data["status"] == "SendData":
-                recv_data(data["to"]["pluginid"], data["data"])
-            elif data["status"] == "SendFile":
-                download_file(_control_interface, data["file"]["path"], data["file"]["save_path"])
-                while not verify_file_hash(data["file"]["save_path"], data["file"]["hash"]):
-                    download_file(_control_interface, data["file"]["path"], data["file"]["save_path"])
-                wait_send_msg = {
-                    "s": 0,
-                    "to": {"id": "-----", "pluginid": data["from"]["pluginid"]},
-                    "from": {"id": self.server_id, "pluginid": data["to"]["pluginid"]},
-                    "status": "RecvFile",
-                    "file": {
-                        "hash": data["file"]["hash"]
-                    },
-                }
-                await self._send(wait_send_msg)
-                _control_interface.info(_control_interface.tr("net_core.service.file_download_finish_from_other").format(data["from"]["id"], data["file"]["save_path"]))
-                recv_file(data["to"]["pluginid"], data["file"]["save_path"])
-            elif data["status"] == "SendFileOK":
-                upload_file(_control_interface, data["file"]["path"], data["file"]["file_path"], self.server_id)
-                msg = {
-                    "s": 0,
-                    "to": {
-                        "id": data["from"]["id"],
-                        "pluginid": data["from"]["pluginid"],
-                    },
-                    "from": {
-                        "id": data["to"]["id"],
-                        "pluginid": data["to"]["pluginid"],
-                    },
-                    "status": "SendFile",
-                    "file": {"hash": data["file"]["hash"], "file_path": data["file"]["file_path"], "save_path": data["file"]["save_path"]},
-                }
-                await self._send(msg)
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_REGISTER_ERROR,
+                            self.data_packet.DEFAULT_SERVER,
+                            self.data_packet.DEFAULT_TO_FROM,
+                            None,
+                        )
+                    )
+            case self.data_packet.TYPE_REGISTER_ERROR:
+                _control_interface.error(f"Register Error: {data["data"]["payload"]}")
+                self.stop_server()
 
+            # Login 数据包
+            case self.data_packet.TYPE_LOGINED:
+                os.system(f"title ConnectCore Client {data["to"][0]}")
+                self.server_id = data["to"][0]
+                self.trigger_websocket_client = self._start_trigger_websocket_client()
+            case self.data_packet.TYPE_NEW_LOGIN:
+                # NewLogin 数据包
+                new_connect(data["data"]["payload"]["server_list"])
+            case self.data_packet.TYPE_DEL_LOGIN:
+                # DelLogin 数据包
+                del_connect(data["data"]["payload"]["server_list"])
+            case self.data_packet.TYPE_LOGIN_ERROR:
+                _control_interface.error(f"Login Error: {data["data"]["payload"]}")
+                self.stop_server()
 
-def start_client() -> None:
-    """
-    启动客户端。
-    """
-    global websocket_client
-    websocket_client = WebsocketClient()
-    websocket_client.start_server()
+            # Data 数据包
+            case self.data_packet.TYPE_DATA_SEND:
+                # Send 数据包
+                if data["data"] and self.data_packet.verify_md5_checksum(
+                    data["data"]["payload"], data["data"]["checksum"]
+                ):
+                    if not data["data"]:
+                        data["data"]["payload"] = {}
+                    recv_data(data["to"][1], data["data"]["payload"])
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_DATA_SENDOK,
+                            self.data_packet.DEFAULT_SERVER,
+                            (self.server_id, data["to"][1]),
+                            None,
+                        )
+                    )
+                else:
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_DATA_ERROR,
+                            self.data_packet.DEFAULT_SERVER,
+                            (self.server_id, data["to"][1]),
+                            {"to": data["to"]},
+                        )
+                    )
+            case self.data_packet.TYPE_DATA_SENDOK:
+                # SendOK 数据包
+                self.last_data_packet = None
+            case self.data_packet.TYPE_DATA_ERROR:
+                # Error 数据包
+                await self._send(self.last_data_packet, False)
 
+            # File 数据包
+            case self.data_packet.TYPE_FILE_SEND:
+                if self.data_packet.verify_md5_checksum(
+                    data["data"]["payload"], data["data"]["checksum"]
+                ):
+                    self._wait_file = open(data["data"]["save_path"], "wb")
+                else:
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_FILE_ERROR,
+                            data["from"],
+                            self.data_packet.DEFAULT_SERVER,
+                            {"to": data["to"]},
+                        )
+                    )
+            case self.data_packet.TYPE_FILE_SENDING:
+                if self.data_packet.verify_md5_checksum(
+                    data["data"]["payload"], data["data"]["checksum"]
+                ):
+                    if self._wait_file:
+                        self._wait_file_list.write(data["data"]["payload"])
+                        self._wait_file_list.flush()
+                    else:
+                        await self._send(
+                            self.data_packet.get_data_packet(
+                                self.data_packet.TYPE_FILE_ERROR,
+                                data["from"],
+                                self.data_packet.DEFAULT_SERVER,
+                                {"to": data["to"]},
+                            )
+                        )
+                else:
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_FILE_ERROR,
+                            data["from"],
+                            self.data_packet.DEFAULT_SERVER,
+                            {"to": data["to"]},
+                        )
+                    )
+            case self.data_packet.TYPE_FILE_SENDOK:
+                if self.data_packet.verify_md5_checksum(
+                    data["data"]["payload"], data["data"]["checksum"]
+                ):
+                    if self._wait_file_list:
+                        self._wait_file_list.close()
+                        if self.data_packet.verify_file_hash(
+                                data["data"]["save_path"], data["data"]["hash"]
+                            ):
+                            recv_file(
+                                    data["from"][1], data["data"]["payload"]["save_path"]
+                                )
+                        else:
+                            await self._send(
+                                self.data_packet.get_data_packet(
+                                    self.data_packet.TYPE_FILE_ERROR,
+                                    data["from"],
+                                    self.data_packet.DEFAULT_SERVER,
+                                    {"to": data["to"]},
+                                )
+                            )
+                    else:
+                        await self._send(
+                            self.data_packet.get_data_packet(
+                                self.data_packet.TYPE_FILE_ERROR,
+                                data["from"],
+                                self.data_packet.DEFAULT_SERVER,
+                                {"to": data["to"]},
+                            )
+                        )
+                else:
+                    await self._send(
+                        self.data_packet.get_data_packet(
+                            self.data_packet.TYPE_FILE_ERROR,
+                            data["from"],
+                            self.data_packet.DEFAULT_SERVER,
+                            {"to": data["to"]},
+                        )
+                    )
 
-@new_thread("Websocket_Server")
-def start_mcdr_server() -> None:
-    """
-    启用 MCDR 多线程启动 WebSocket 客户端。
-    仅在 MCDR 环境下调用。
-    """
-    global websocket_client
-    websocket_client = WebsocketClient()
-    websocket_client.start_server()
+            case _:
+                pass
+
+    # =========
+    #   Tools
+    # =========
+    @auto_trigger(interval=30, thread_name="trigger_websocket_client")
+    def _start_trigger_websocket_client(self) -> None:
+        """启动PING PONG数据包服务"""
+        asyncio.run(self._trigger_websocket_client())
 
 
 # Public
+@new_thread("Websocket_Client")
 def websocket_client_main(control_interface: "CoreControlInterface") -> None:
     """
     初始化 WebSocket 客户端。
@@ -363,17 +526,12 @@ def websocket_client_main(control_interface: "CoreControlInterface") -> None:
 
     _control_interface = control_interface
     time.sleep(0.3)
-    if get_mcdr():
-        start_mcdr_server()
-    else:
-        websocket_client_thread = threading.Thread(target=start_client)
-        websocket_client_thread.daemon = True
-        websocket_client_thread.start()
+    global websocket_client
+    websocket_client = WebsocketClient()
+    websocket_client.start_server()
 
 
-def send_data(
-    f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict
-) -> None:
+def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) -> None:
     """
     发送消息到指定的子服务器。
 
@@ -383,8 +541,10 @@ def send_data(
         t_plugin_id (str): 子服务器插件的唯一标识符
         data (dict): 要发送的消息内容。
     """
-    websocket_client.send_data_to_other_server(
-        f_plugin_id, t_server_id, t_plugin_id, data
+    asyncio.run(
+        websocket_client.send_data_to_other_server(
+            f_plugin_id, t_server_id, t_plugin_id, data
+        )
     )
 
 
@@ -405,8 +565,10 @@ def send_file(
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    websocket_client.send_file_to_other_server(
-        f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+    asyncio.run(
+        websocket_client.send_file_to_other_server(
+            f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+        )
     )
 
 

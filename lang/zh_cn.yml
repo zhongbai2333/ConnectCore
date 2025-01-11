@@ -3,8 +3,6 @@ connect_core:
     initialization_config:
       enter_ip: "请输入服务器IP/域名(公网): [127.0.0.1] "
       enter_port: "请输入服务器端口: [23233] "
-      enter_http_port: "请输入 HTTP 文件服务器端口：[4443] "
-      enter_password: "请输入群服务器密钥: [{}] "
       enter_key: "请输入初始化密钥: "
       finish: "已将配置文件保存至 config.json"
     starting:
@@ -12,7 +10,6 @@ connect_core:
       welcome_password: "群组密钥为: {}"
   net_core:
     service:
-      start_http: "HTTP 文件服务器已启动于 {}"
       start_websocket: "Websocket 启动成功！"
       connect_websocket: "Websocket 连接成功！{}"
       stop_websocket: "Websocket 已关闭！"

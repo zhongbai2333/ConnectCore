@@ -1,15 +1,49 @@
 import os
 import sys
 import time
-import requests
+import json
+import websockets
+import asyncio
 from connect_core.storage import YmlLanguage, JsonDataEditor
 from connect_core.account.login_system import analyze_password
 from connect_core.cli.cli_core import Server, Client
 from connect_core.tools import restart_program
+from connect_core.websocket.data_packet import DataPacket
 
 _is_server = False
 
+
 # Function
+async def check_websocket(server_uri) -> bool:
+    """
+    检查websocket服务器是否在线
+    """
+    try:
+        async with websockets.connect(server_uri) as websocket:
+            print(f"Connected to {server_uri} successfully!")
+            data_packet = DataPacket()
+            # 可以发送和接收消息以进一步测试
+            await websocket.send(
+                json.dumps(
+                    data_packet.get_data_packet(
+                        data_packet.TYPE_TEST_CONNECT,
+                        data_packet.DEFAULT_TO_FROM,
+                        data_packet.DEFAULT_TO_FROM,
+                        None,
+                    )["-----"]
+                )
+            )
+            response = await websocket.recv()
+            print(json.loads(response)["type"])
+            if json.loads(response)["type"] == list(data_packet.TYPE_TEST_CONNECT):
+                print(f"Received response: {response}")
+                return True
+            return False
+    except Exception as e:
+        print(f"Failed to connect to {server_uri}: {e}")
+        return False
+
+
 def _initialization_config() -> None:
     """
     第一次启动时的配置初始化过程。
@@ -36,14 +70,6 @@ def _initialization_config() -> None:
         )
         port = int(port) if port else 23233
 
-        # 输入HTTP端口
-        http_port = input(
-            translate_temp["connect_core"]["cli"]["initialization_config"][
-                "enter_http_port"
-            ]
-        )
-        http_port = int(http_port) if http_port else 4443
-
         print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])
 
         JsonDataEditor("config.json").write(
@@ -51,7 +77,6 @@ def _initialization_config() -> None:
                 "language": lang,
                 "ip": ip,
                 "port": port,
-                "http_port": http_port,
                 "debug": False,
             }
         )
@@ -66,14 +91,16 @@ def _initialization_config() -> None:
             ip_list.append(i)
         ip_list.append(list(data["ip"].values())[-1])
         for ip in ip_list:
-            url = f"http://{ip}:{data['http_port']}"
-            r = requests.get(url, timeout=5)
-            code = r.status_code
-            if code == 404:
+            url = f"ws://{ip}:{data['port']}"
+            if asyncio.run(check_websocket(url)):
                 last_ip = ip
                 break
-            else:
-                print(f"Error: Can't Visit Server!{ip_list}")
+        else:
+            print(f"Error: Can't Visit Server! {ip_list}")
+            ip = input("Please enter the correct IP address: ")
+            url = f"ws://{ip}:{data['port']}"
+            if not asyncio.run(check_websocket(url)):
+                print(f"Error: Can't Visit Server! {ip}, please check the IP address.")
                 return
 
         print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])
@@ -83,8 +110,7 @@ def _initialization_config() -> None:
                 "language": lang,
                 "ip": last_ip,
                 "port": data["port"],
-                "http_port": data["http_port"],
-                "account": "",
+                "account": "-----",
                 "password": data["password"],
                 "debug": False,
             }

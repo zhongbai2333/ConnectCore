@@ -3,16 +3,9 @@
 ```json
 {
     "s": sID,                   // 数据包编号，确认数据发送正确
-    "type": typeID,             // 数据包类型标识符，定义见下文。
-    "status": StatusID,         // 当前数据包的状态码，定义见下文。
-    "to": {
-        "id": ToServerID,       // 目标服务器的唯一标识符。
-        "pluginid": ToPluginID  // 目标插件的唯一标识符。
-    },
-    "from": {
-        "id": FromServerID,     // 发送服务器的唯一标识符。
-        "pluginid": FromPluginID // 发送插件的唯一标识符。
-    },
+    "type": ("TYPE", "STATUS"),             // 数据包类型标识符，定义见下文。
+    "to": ("SERVER_ID", "PLUGIN_ID"),       // 数据包目标
+    "from": ("SERVER_ID", "PLUGIN_ID"),     // 数据包来源
     "data": {
         "payload": Data,        // 数据载荷，内容根据数据包类型变化。
         "timestamp": Timestamp, // 时间戳，用于标识数据发送的时间。
@@ -23,12 +16,16 @@
 
 ## 数据包类型及状态定义
 
-### [0] Basic 数据包
+### [-1] Test 数据包
 
 - `status`:
   - `[0] Test` - 测试连接。
-  - `[1] Ping` - Ping数据包。
-  - `[2] Pong` - Pong数据包。
+
+### [0] Basic 数据包
+
+- `status`:
+  - `[0] Ping` - Ping数据包。
+  - `[1] Pong` - Pong数据包。
 
 ### [1] Control 数据包
 
@@ -60,7 +57,6 @@
   - `[0] Send` - 请求发送数据。
   - `[1] SendOK` - 确认接收数据。
   - `[2] DataError` - 数据传输失败，提供错误详情。
-  - `[3] DataPending` - 数据正在处理，需等待完成。
 
 ### [5] File 数据包
 
@@ -69,14 +65,6 @@
   - `[1] Sending` - 正在发送文件。
   - `[2] SendOK` - 确认接收文件。
   - `[3] FileError` - 文件传输失败，提供错误详情。
-  - `[4] FilePending` - 文件正在处理或校验中。
-
-### [-1] 通用错误码
-
-- `Status`:
-  - `[-1] InvalidRequest` - 无效请求，格式或内容错误。
-  - `[-2] Unauthorized` - 未授权访问。
-  - `[-3] Timeout` - 请求超时。
 
 ## 数据包流程
 

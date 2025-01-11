@@ -1,12 +1,101 @@
 import os
 import sys
-import hashlib
+import time
 import base64
 import psutil
 import socket
+import functools
 import requests
+import threading
+from typing import Optional, Union, Callable
 
-def restart_program():
+from mcdreforged.api.all import new_thread as mcdr_new_thread
+
+
+def is_running_in_mcdr():
+    return any(module.startswith("mcdreforged") for module in sys.modules)
+
+
+if not is_running_in_mcdr():
+
+    class FunctionThread(threading.Thread):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.daemon = True  # 确保线程为守护线程
+
+    def new_thread(arg: Optional[Union[str, Callable]] = None):
+        """
+        启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
+        """
+
+        def wrapper(func):
+            @functools.wraps(func)
+            def wrap(*args, **kwargs):
+                # 检查是否是类方法
+                if len(args) > 0 and hasattr(args[0], func.__name__):
+                    # 将未绑定方法绑定到实例
+                    bound_func = func.__get__(args[0])
+                else:
+                    # 普通函数
+                    bound_func = func
+
+                # 创建线程
+                thread = FunctionThread(
+                    target=bound_func, args=args, kwargs=kwargs, name=thread_name
+                )
+                thread.start()
+                return thread
+
+            wrap.original = func  # 保留原始函数
+            return wrap
+
+        if isinstance(arg, Callable):  # @new_thread 用法
+            thread_name = None
+            return wrapper(arg)
+        else:  # @new_thread(...) 用法
+            thread_name = arg
+            return wrapper
+
+else:
+    # 如果运行在 MCDR 环境中，直接使用其 new_thread 实现
+    new_thread = mcdr_new_thread
+
+
+def auto_trigger(interval: float, thread_name: Optional[str] = None):
+    def decorator(func: Callable):
+        stop_event = threading.Event()
+
+        def trigger_loop(instance=None, *args, **kwargs):
+            while not stop_event.is_set():
+                if instance:
+                    wrapped_func = new_thread(thread_name)(func.__get__(instance))
+                else:
+                    wrapped_func = new_thread(thread_name)(func)
+                wrapped_func(*args, **kwargs)
+                stop_event.wait(interval)
+
+        @new_thread(f"{thread_name or func.__name__}_trigger_loop")
+        def start_trigger(instance=None, *args, **kwargs):
+            trigger_thread = threading.Thread(
+                target=trigger_loop,
+                args=(instance,) + args,
+                kwargs=kwargs,
+                name=thread_name,
+                daemon=True,
+            )
+            trigger_thread.start()
+            return trigger_thread
+
+        def stop():
+            stop_event.set()
+
+        start_trigger.stop = stop
+        return start_trigger
+
+    return decorator
+
+
+def restart_program() -> None:
     """
     重启程序，使用当前的Python解释器重新执行当前脚本。
     """
@@ -14,7 +103,7 @@ def restart_program():
     os.execl(python, python, *sys.argv)
 
 
-def check_file_exists(file_path):
+def check_file_exists(file_path) -> bool:
     """
     检查目录中的特定文件是否存在。
 
@@ -29,55 +118,7 @@ def check_file_exists(file_path):
     return os.path.isfile(file_path)
 
 
-def get_file_hash(file_path, algorithm="sha256"):
-    """
-    获取文件的哈希值。
-
-    Args:
-        file_path (str): 文件路径
-        algorithm (str): 哈希算法，默认使用 'sha256'
-
-    Returns:
-        str: 文件的哈希值，如果文件不存在则返回 None
-    """
-    try:
-        hash_func = hashlib.new(algorithm)
-
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_func.update(chunk)
-
-        return hash_func.hexdigest()
-    except (IOError, OSError) as e:
-        print(f"计算哈希值时出错: {e}")
-        return None
-    except ValueError as e:
-        print(f"不支持的哈希算法: {e}")
-        return None
-
-
-def verify_file_hash(file_path, expected_hash, algorithm="sha256"):
-    """
-    验证文件的哈希值。
-
-    Args:
-        file_path (str): 文件路径
-        expected_hash (str): 预期的哈希值
-        algorithm (str): 哈希算法，默认使用 'sha256'
-
-    Returns:
-        bool: 如果哈希值匹配则返回 True，否则返回 False
-    """
-    actual_hash = get_file_hash(file_path, algorithm)
-
-    if actual_hash is None:
-        print("无法获取文件的哈希值。")
-        return False
-
-    return actual_hash == expected_hash
-
-
-def append_to_path(path, filename):
+def append_to_path(path, filename) -> str:
     """
     Appends a filename to the given path if it is a directory.
 
@@ -114,7 +155,7 @@ def decode_base64(encoded_data: str) -> str:
     return decoded_bytes.decode("utf-8")
 
 
-def get_all_internal_ips():
+def get_all_internal_ips() -> list:
     """
     获取所有网卡的内网IP地址
     :return: 一个列表, 包含所有内网IP地址

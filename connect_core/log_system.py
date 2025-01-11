@@ -1,6 +1,7 @@
 import os
 import time
 import html
+import threading
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit import print_formatted_text
 
@@ -46,11 +47,11 @@ class LogSystem:
             colored_level = self._get_colored_text(level)
             # 使用 html.escape 转义日志消息中的特殊字符
             escaped_msg = html.escape(msg)
-            formatted_message = (
-                f"[{timestamp}] {colored_level} [{self.sid}] {escaped_msg}"
-            )
+            formatted_message = f"({threading.current_thread().name}) [{timestamp}] {colored_level} [{self.sid}] {escaped_msg}"
             print_formatted_text(HTML(formatted_message))
-            file.write(f"[{timestamp}] [{level}] [{self.sid}] {msg}\n")
+            file.write(
+                f"({threading.current_thread().name}) [{timestamp}] [{level}] [{self.sid}] {msg}\n"
+            )
 
     def info(self, *msg) -> None:
         """
