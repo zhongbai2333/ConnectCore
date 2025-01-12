@@ -101,7 +101,7 @@ class DataPacket(object):
             server_id (str): 服务器id
             packet (dict): 数据包
         """
-        if server_id != "-----":
+        if (server_id != "-----" or not self._is_server) and packet["type"][0] != 0:
             if server_id in self._packet_list.keys():
                 self._packet_list[server_id].append(packet)
             else:

@@ -44,7 +44,6 @@ class WebsocketClient(object):
         self.server_list = []  # 服务器列表
         self.last_data_packet = None  # 上一个发送的一个数据包
         self.data_packet = DataPacket()  # 数据包处理类
-        self.trigger_websocket_client = None  # 触发器
         self._wait_file = None  # 等待接收的文件
 
     # ===========
@@ -61,8 +60,7 @@ class WebsocketClient(object):
         停止 WebSocket 客户端。
         如果接收任务正在运行，则取消该任务，否则取消主任务。
         """
-        if self.trigger_websocket_client:
-            self.trigger_websocket_client.stop()
+        self._start_trigger_websocket_client.stop()
         if self._receive_task:
             self._receive_task.cancel()
         else:
@@ -148,7 +146,7 @@ class WebsocketClient(object):
         接收并处理从服务器发送的消息。
         初始连接时会向服务器发送连接状态消息。
         """
-        if self._config["account"]:
+        if self._config["account"] != "-----":
             await self._send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_LOGIN,
@@ -174,9 +172,6 @@ class WebsocketClient(object):
                     if str(recv_data.decode())[0] != "{":
                         recv_data = aes_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
-                    _control_interface.debug(
-                        f"Received data from main server: {recv_data}"
-                    )
                     await self._parse_msg(recv_data)
                 else:
                     break
@@ -227,7 +222,6 @@ class WebsocketClient(object):
             await self._send(self.last_data_packet, False)
         await self._send(
             self.data_packet.get_data_packet(
-                self.sid,
                 self.data_packet.TYPE_PING,
                 self.data_packet.DEFAULT_SERVER,
                 (self.server_id, "system"),
@@ -264,6 +258,7 @@ class WebsocketClient(object):
         self.last_data_packet = msg
         await self._send(msg)
 
+    @new_thread("SendFile")
     async def send_file_to_other_server(
         self,
         f_plugin_id: str,
@@ -343,7 +338,7 @@ class WebsocketClient(object):
         Args:
             data (dict): 从服务器接收到的消息内容。
         """
-        data_type = list(data["type"])
+        data_type = tuple(data["type"])
         self.data_packet.add_recv_packet("-----", data)
         _control_interface.debug(
             f"[R][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
@@ -379,7 +374,7 @@ class WebsocketClient(object):
             case self.data_packet.TYPE_LOGINED:
                 os.system(f"title ConnectCore Client {data["to"][0]}")
                 self.server_id = data["to"][0]
-                self.trigger_websocket_client = self._start_trigger_websocket_client()
+                self._start_trigger_websocket_client()
             case self.data_packet.TYPE_NEW_LOGIN:
                 # NewLogin 数据包
                 new_connect(data["data"]["payload"]["server_list"])
@@ -428,7 +423,7 @@ class WebsocketClient(object):
                 if self.data_packet.verify_md5_checksum(
                     data["data"]["payload"], data["data"]["checksum"]
                 ):
-                    self._wait_file = open(data["data"]["save_path"], "wb")
+                    self._wait_file = open(data["data"]["payload"]["save_path"], "wb")
                 else:
                     await self._send(
                         self.data_packet.get_data_packet(
@@ -443,7 +438,7 @@ class WebsocketClient(object):
                     data["data"]["payload"], data["data"]["checksum"]
                 ):
                     if self._wait_file:
-                        self._wait_file_list.write(data["data"]["payload"])
+                        self._wait_file_list.write(data["data"]["payload"]["file"])
                         self._wait_file_list.flush()
                     else:
                         await self._send(
@@ -470,8 +465,9 @@ class WebsocketClient(object):
                     if self._wait_file_list:
                         self._wait_file_list.close()
                         if self.data_packet.verify_file_hash(
-                                data["data"]["save_path"], data["data"]["hash"]
-                            ):
+                            data["data"]["payload"]["save_path"],
+                            data["data"]["payload"]["hash"],
+                        ):
                             recv_file(
                                     data["from"][1], data["data"]["payload"]["save_path"]
                                 )

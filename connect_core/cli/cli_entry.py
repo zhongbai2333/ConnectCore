@@ -34,9 +34,7 @@ async def check_websocket(server_uri) -> bool:
                 )
             )
             response = await websocket.recv()
-            print(json.loads(response)["type"])
             if json.loads(response)["type"] == list(data_packet.TYPE_TEST_CONNECT):
-                print(f"Received response: {response}")
                 return True
             return False
     except Exception as e:

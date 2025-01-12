@@ -3,6 +3,7 @@ from connect_core.api.plugin import *
 from connect_core.api.rsa import *
 from connect_core.api.tools import *
 from connect_core.api.data_packet import *
+from connect_core.api.account import *
 
 __all__ = [
     "CoreControlInterface",
@@ -28,4 +29,7 @@ __all__ = [
     "new_thread",
     "auto_trigger",
     "DataPacket",
+    "analyze_password",
+    "get_password",
+    "get_register_password",
 ]

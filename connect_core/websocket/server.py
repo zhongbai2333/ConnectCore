@@ -39,7 +39,6 @@ class WebsocketServer(object):
         self._wait_register_connect = {}
         self.last_send_packet = {}
         self.data_packet = DataPacket()
-        self.auto_resend = None
 
     # =========== Control ===========
     def start_server(self) -> None:
@@ -69,7 +68,7 @@ class WebsocketServer(object):
             _control_interface.info(
                 _control_interface.tr("net_core.service.start_websocket")
             )
-            self.auto_resend = self._start_resend()
+            self._start_resend()
             await asyncio.Future()  # 阻塞以保持服务器运行
 
     # ============ Connect ============
@@ -127,7 +126,7 @@ class WebsocketServer(object):
                 del self.servers_info[server_id]
 
             self.data_packet.del_server_id(server_id)
-            self.auto_resend.stop()
+            self._start_resend.stop()
 
             disconnected()
             del_connect(list(self.servers_info.keys()))
@@ -154,23 +153,23 @@ class WebsocketServer(object):
 
     # ============ Send Data ============
     async def _send(
-        self, data: dict, websocket, account: str, from_data_packet: bool = True
+        self, data: dict, websocket, account: str
     ) -> None:
         """向指定的 WebSocket 客户端发送消息。"""
-        if from_data_packet:
+        if account in data.keys():
             data = data[account]
         _control_interface.debug(
             f"[S][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
         )
 
         accounts = _control_interface.get_config("account.json")
-        if account in accounts:
-            await websocket.send(
-                aes_encrypt(json.dumps(data).encode(), accounts[account])
-            )
-        elif account == "-----":
+        if account == "-----":
             await websocket.send(
                 aes_encrypt(json.dumps(data).encode(), get_register_password())
+            )
+        elif account in accounts:
+            await websocket.send(
+                aes_encrypt(json.dumps(data).encode(), accounts[account])
             )
         else:
             raise ValueError(f"Unknown Account: {account}")
@@ -206,6 +205,7 @@ class WebsocketServer(object):
                 msg[t_server_id], self.websockets[t_server_id], t_server_id
             )
 
+    @new_thread("SendFile")
     async def send_file_to_other_server(
         self,
         f_server_id: str,
@@ -326,19 +326,19 @@ class WebsocketServer(object):
         """解析并处理从子服务器接收到的消息。"""
         server_id = data["from"][0]
         to_server_id = data["to"][0]
-        data_type = list(data["type"])
+        data_type = tuple(data["type"])
         self.data_packet.add_recv_packet(server_id, data)
         _control_interface.debug(
             f"[R][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
         )
-        if to_server_id == "-----":
+        if to_server_id == "-----" or to_server_id == "all":
             if to_server_id == "all":
                 await self._broadcast(data)
             match data_type:
                 # PING 数据包
                 case self.data_packet.TYPE_PING:
                     history_packet = self.data_packet.get_history_packet(
-                        server_id, data["s"]
+                        server_id, data["sid"]
                     )
                     if not history_packet:
                         await self._send(
@@ -352,12 +352,11 @@ class WebsocketServer(object):
                             server_id,
                         )
                     else:
-                        for i in history_packet[server_id]:
+                        for i in history_packet:
                             await self._send(
                                 i,
                                 websocket,
                                 server_id,
-                                False,
                             )
 
                 # Control 数据包
@@ -379,9 +378,9 @@ class WebsocketServer(object):
                             (server_id, "system"),
                             self.data_packet.DEFAULT_SERVER,
                             {"password": password},
-                        ),
+                        )[server_id],
                         websocket,
-                        server_id,
+                        "-----",
                     )
                 case self.data_packet.TYPE_REGISTER_ERROR:
                     server_id = self._generate_random_id(5)
@@ -398,15 +397,14 @@ class WebsocketServer(object):
                             (server_id, "system"),
                             self.data_packet.DEFAULT_SERVER,
                             {"password": password},
-                        ),
+                        )[server_id],
                         websocket,
-                        server_id,
+                        "-----",
                     )
 
                 # Login 数据包
                 case self.data_packet.TYPE_LOGIN:
                     self.websockets[server_id] = websocket
-                    self.broadcast_websockets.add(websocket)
                     self.servers_info[server_id] = data["data"]["payload"]
                     _control_interface.info(
                         _control_interface.tr(
@@ -481,7 +479,7 @@ class WebsocketServer(object):
                         data["data"]["payload"], data["data"]["checksum"]
                     ):
                         self._wait_file_list[server_id] = open(
-                            data["data"]["save_path"], "wb"
+                            data["data"]["payload"]["save_path"], "wb"
                         )
                     else:
                         await self._send(
@@ -500,7 +498,7 @@ class WebsocketServer(object):
                     ):
                         if server_id in self._wait_file_list:
                             self._wait_file_list[server_id].write(
-                                data["data"]["payload"]
+                                data["data"]["payload"]["file"]
                             )
                             self._wait_file_list[server_id].flush()
                         else:
@@ -532,7 +530,8 @@ class WebsocketServer(object):
                         if server_id in self._wait_file_list:
                             self._wait_file_list[server_id].close()
                             if self.data_packet.verify_file_hash(
-                                data["data"]["save_path"], data["data"]["hash"]
+                                data["data"]["payload"]["save_path"],
+                                data["data"]["payload"]["hash"],
                             ):
                                 recv_file(
                                     data["from"][1],
