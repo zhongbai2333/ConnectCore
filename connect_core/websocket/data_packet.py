@@ -40,7 +40,7 @@ class DataPacket(object):
         self.DEFAULT_ALL = ("all", "system")
 
     def get_data_packet(
-        self, Type: tuple, ToInfo: tuple, FromInfo: tuple, Data: any
+        self, Type: tuple, ToInfo: tuple, FromInfo: tuple, Data: any, But_sevrer_id: list = []
     ) -> dict:
         """
         获取数据包格式
@@ -58,16 +58,16 @@ class DataPacket(object):
         elif Type[0] == 0:
             sid = self._get_sid(ToInfo[0], False)
         else:
-            sid = self._get_sid(ToInfo[0])
+            sid = self._get_sid(ToInfo[0], But_sevrer_id=But_sevrer_id)
+        if Data is None:
+            Data = {}
+        else:
+            Data = {
+                "payload": Data,
+                "timestamp": time.time(),
+                "checksum": self.generate_md5_checksum(Data),
+            }
         for i in sid.keys():
-            if Data is None:
-                Data = {}
-            else:
-                Data = {
-                    "payload": Data,
-                    "timestamp": time.time(),
-                    "checksum": self.generate_md5_checksum(Data),
-                }
             packet = {
                 "sid": sid[i],
                 "type": Type,
@@ -75,7 +75,7 @@ class DataPacket(object):
                 "from": FromInfo,
                 "data": Data,
             }
-            if sid[i] != -1:
+            if sid[i] != -1 and Type[0] != 0:
                 self._packet_list[i].append(packet)
             packets[i] = packet
         return packets
@@ -116,21 +116,36 @@ class DataPacket(object):
         """
         if server_id in self._packet_list.keys():
             del self._packet_list[server_id]
+    
+    def del_recv_packet(self, server_id: str, num: int) -> None:
+        """
+        删除接收到的数据包
 
-    def _get_sid(self, server_id: str, add_sid: bool = True) -> dict:
+        Args:
+            server_id (str): 服务器id
+            num (int): 从后往前删除的数据包数量
+        """
+        if server_id in self._packet_list.keys():
+            self._packet_list[server_id] = self._packet_list[server_id][:-num]
+
+    def _get_sid(
+        self, server_id: str, add_sid: bool = True, But_sevrer_id: list = []
+    ) -> dict:
         """
         获取sid
 
         Args:
             server_id (str): 服务器id
             add_sid (bool): 是否添加sid，默认为True
+            But_sevrer_id (list): 排除的服务器id
         :return: sid字典
         """
         sid_list = {}
         if self._is_server:  # 服务器
             if server_id == "all":  # 发送给所有服务器
                 for i in self._packet_list.keys():
-                    sid_list[i] = len(self._packet_list[i]) + 1
+                    if i not in But_sevrer_id:
+                        sid_list[i] = len(self._packet_list[i]) + 1
             elif server_id == "-----":  # 发送给陌生客户端
                 sid_list["-----"] = 0
             else:  # 发送给指定客户端

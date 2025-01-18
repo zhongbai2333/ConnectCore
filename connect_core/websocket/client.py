@@ -125,7 +125,13 @@ class WebsocketClient(object):
                 websockets.ConnectionClosedError,
                 websockets.ConnectionClosedOK,
             ) as e:
-                if str(e) != "received 1000 (OK) 400; then sent 1000 (OK) 400":
+                if str(e) == "received 1000 (OK) 401; then sent 1000 (OK) 401":
+                    _control_interface.error(
+                        _control_interface.tr("net_core.service.already_login")
+                    )
+                    self.stop_server()
+                    return
+                elif str(e) != "received 1000 (OK) 400; then sent 1000 (OK) 400":
                     _control_interface.info(
                         _control_interface.tr("net_core.service.disconnect_websocket")
                         + str(e)
@@ -186,7 +192,7 @@ class WebsocketClient(object):
     #   Send Msg
     # ============
     async def _send(
-        self, data: dict, from_data_pack: bool = True, account: str = None
+        self, data: dict, account: str = None
     ) -> None:
         """
         向服务器发送消息。
@@ -195,8 +201,7 @@ class WebsocketClient(object):
             data (dict): 要发送的消息内容。
             account (str): 账号, 默认为None
         """
-        if from_data_pack:
-            data = data["-----"]
+        data = data["-----"]
         if account is None:
             account = self._config["account"]
         _control_interface.debug(
@@ -219,7 +224,7 @@ class WebsocketClient(object):
     async def _trigger_websocket_client(self) -> None:
         # 如果有上一个数据包，则发送上一个数据包
         if self.last_data_packet:
-            await self._send(self.last_data_packet, False)
+            await self._send(self.last_data_packet)
         await self._send(
             self.data_packet.get_data_packet(
                 self.data_packet.TYPE_PING,
@@ -382,7 +387,7 @@ class WebsocketClient(object):
                 # DelLogin 数据包
                 del_connect(data["data"]["payload"]["server_list"])
             case self.data_packet.TYPE_LOGIN_ERROR:
-                _control_interface.error(f"Login Error: {data["data"]["payload"]}")
+                _control_interface.error(f"Login Error: {data["data"]["payload"]["error"]}")
                 self.stop_server()
 
             # Data 数据包
@@ -416,7 +421,7 @@ class WebsocketClient(object):
                 self.last_data_packet = None
             case self.data_packet.TYPE_DATA_ERROR:
                 # Error 数据包
-                await self._send(self.last_data_packet, False)
+                await self._send(self.last_data_packet)
 
             # File 数据包
             case self.data_packet.TYPE_FILE_SEND:

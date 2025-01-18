@@ -3,10 +3,12 @@ from connect_core.log_system import LogSystem
 class CoreControlInterface:
     def __init__(self):
         import sys
+        from connect_core.cli.cli_entry import get_is_server
 
         self.sid = "connect_core"
         self.self_path = sys.argv[0]
         self.config_path = "./config.json"
+        self._is_server = get_is_server()
         self.log_system = LogSystem(
             self.sid,
             (
@@ -181,9 +183,7 @@ class PluginControlInterface(CoreControlInterface):
             plugin_id (str): 目标服务器插件的唯一标识符
             data (str): 要发送的数据。
         """
-        from connect_core.websocket.server import websocket_server
-
-        if websocket_server:
+        if self._is_server:
             from connect_core.websocket.server import (
                 send_data as server_send_data,
             )

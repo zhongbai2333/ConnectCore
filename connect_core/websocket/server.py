@@ -47,6 +47,7 @@ class WebsocketServer(object):
 
     def close_server(self) -> None:
         """关闭 WebSocket 服务器。"""
+        self._start_resend.stop()
         if hasattr(self, "main_task"):
             self.main_task.cancel()
 
@@ -92,20 +93,23 @@ class WebsocketServer(object):
                         )
                     )
                     await websocket.close(reason="200")
-        except websockets.exceptions.ConnectionClosed:
-            if "account" in msg.keys():
-                await self._close_connection(server_id, websocket)
+        except websockets.exceptions.ConnectionClosed as e:
+            if str(e) == "sent 1000 (OK) 401; then received 1000 (OK) 401":
+                pass
+            else:
+                if "account" in msg.keys():
+                    await self._close_connection(server_id, websocket)
 
     async def _process_message(self, msg: str, websocket, server_id: str) -> None:
         """处理接收到的消息并进行响应。"""
         accounts = _control_interface.get_config("account.json").copy()
-        try:
-            msg_data = self._decrypt_message(msg, server_id, accounts)
-            await self._parse_msg(msg_data, websocket)
-        except Exception as e:
+        """try:"""
+        msg_data = self._decrypt_message(msg, server_id, accounts)
+        await self._parse_msg(msg_data, websocket)
+        """except Exception as e:
             _control_interface.debug(f"Error with sub-server connection: {e}")
             await websocket.close(reason="400")
-            await self._close_connection(server_id, websocket)
+            await self._close_connection(server_id, websocket)"""
 
     def _decrypt_message(self, msg: dict, account: str, accounts: dict) -> dict:
         """解密消息并返回解密后的数据。"""
@@ -117,16 +121,17 @@ class WebsocketServer(object):
             raise ValueError(f"Unknown Account: {account}")
         return msg
 
-    async def _close_connection(self, server_id: str = None, websocket = None) -> None:
+    async def _close_connection(self, server_id: str = None, websocket=None) -> None:
         """关闭与子服务器的连接并清理相关数据。"""
         if server_id != "-----" and websocket:
-            if server_id in self.websockets:
+            if server_id in self.websockets.keys():
                 del self.websockets[server_id]
-            if server_id in self.servers_info:
+            if server_id in self.servers_info.keys():
                 del self.servers_info[server_id]
+            if server_id in self.last_send_packet.keys():
+                del self.last_send_packet[server_id]
 
             self.data_packet.del_server_id(server_id)
-            self._start_resend.stop()
 
             disconnected()
             del_connect(list(self.servers_info.keys()))
@@ -152,14 +157,12 @@ class WebsocketServer(object):
             )
 
     # ============ Send Data ============
-    async def _send(
-        self, data: dict, websocket, account: str
-    ) -> None:
+    async def _send(self, data: dict, websocket, account: str) -> None:
         """向指定的 WebSocket 客户端发送消息。"""
         if account in data.keys():
             data = data[account]
         _control_interface.debug(
-            f"[S][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
+            f"[S][{data['type']}][{data['from']} -> {data['to']}({account})][{data['sid']}] {data['data']}"
         )
 
         accounts = _control_interface.get_config("account.json")
@@ -174,10 +177,10 @@ class WebsocketServer(object):
         else:
             raise ValueError(f"Unknown Account: {account}")
 
-    async def _broadcast(self, data: dict, server_ids: list = []) -> None:
+    async def _broadcast(self, data: dict, except_id: list = []) -> None:
         """广播消息到所有已连接的子服务器。"""
-        for server_id in self.websockets.keys():
-            if server_id not in server_ids:
+        for server_id in data.keys():
+            if server_id not in except_id:
                 await self._send(data[server_id], self.websockets[server_id], server_id)
 
     async def send_data_to_other_server(
@@ -197,7 +200,8 @@ class WebsocketServer(object):
             data,
         )
         if t_server_id == "all":
-            self.last_send_packet[t_server_id] = msg
+            for i in self.servers_info.keys():
+                self.last_send_packet[i] = msg
             await self._broadcast(msg, except_id)
         else:
             self.last_send_packet[t_server_id] = msg
@@ -333,7 +337,17 @@ class WebsocketServer(object):
         )
         if to_server_id == "-----" or to_server_id == "all":
             if to_server_id == "all":
-                await self._broadcast(data)
+                if data["data"]:
+                    data_return = data["data"]["payload"]
+                else:
+                    data_return = None
+                packet = self.data_packet.get_data_packet(
+                    data["type"], data["to"], data["from"], data_return, [server_id]
+                )
+                if data_type == self.data_packet.TYPE_DATA_SEND:
+                    for i in packet.keys():
+                        self.last_send_packet[i] = packet[i]
+                await self._broadcast(packet)
             match data_type:
                 # PING 数据包
                 case self.data_packet.TYPE_PING:
@@ -404,32 +418,46 @@ class WebsocketServer(object):
 
                 # Login 数据包
                 case self.data_packet.TYPE_LOGIN:
-                    self.websockets[server_id] = websocket
-                    self.servers_info[server_id] = data["data"]["payload"]
-                    _control_interface.info(
-                        _control_interface.tr(
-                            "net_core.service.connect_websocket"
-                        ).format(f"Server {server_id}")
-                    )
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_LOGINED,
-                            (server_id, "system"),
-                            self.data_packet.DEFAULT_SERVER,
-                            None,
-                        ),
-                        websocket,
-                        server_id,
-                    )
-                    new_connect(list(self.servers_info.keys()))
-                    await self._broadcast(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_NEW_LOGIN,
-                            self.data_packet.DEFAULT_ALL,
-                            self.data_packet.DEFAULT_SERVER,
-                            {"server_list": list(self.servers_info.keys())},
+                    if server_id not in self.websockets.keys():
+                        self.websockets[server_id] = websocket
+                        self.servers_info[server_id] = data["data"]["payload"]
+                        _control_interface.info(
+                            _control_interface.tr(
+                                "net_core.service.connect_websocket"
+                            ).format(f"Server {server_id}")
                         )
-                    )
+                        await self._send(
+                            self.data_packet.get_data_packet(
+                                self.data_packet.TYPE_LOGINED,
+                                (server_id, "system"),
+                                self.data_packet.DEFAULT_SERVER,
+                                None,
+                            ),
+                            websocket,
+                            server_id,
+                        )
+                        new_connect(list(self.servers_info.keys()))
+                        await self._broadcast(
+                            self.data_packet.get_data_packet(
+                                self.data_packet.TYPE_NEW_LOGIN,
+                                self.data_packet.DEFAULT_ALL,
+                                self.data_packet.DEFAULT_SERVER,
+                                {"server_list": list(self.servers_info.keys())},
+                            )
+                        )
+                    else:
+                        await self._send(
+                            self.data_packet.get_data_packet(
+                                self.data_packet.TYPE_LOGIN_ERROR,
+                                (server_id, "system"),
+                                self.data_packet.DEFAULT_SERVER,
+                                {"error": "Already Login"},
+                            ),
+                            websocket,
+                            server_id,
+                        )
+                        self.data_packet.del_recv_packet(server_id, 2)
+                        await websocket.close(reason="401")
 
                 # Data 数据包
                 case self.data_packet.TYPE_DATA_SEND:
@@ -440,7 +468,7 @@ class WebsocketServer(object):
                         if not data["data"]:
                             data["data"]["payload"] = {}
                         recv_data(data["from"][1], data["data"]["payload"])
-                        self._send(
+                        await self._send(
                             self.data_packet.get_data_packet(
                                 self.data_packet.TYPE_DATA_SENDOK,
                                 data["from"],
@@ -574,7 +602,30 @@ class WebsocketServer(object):
                 case _:
                     pass
         else:
-            await self._send(data, self.websockets[to_server_id], to_server_id)
+            if data["data"]:
+                data_return = data["data"]["payload"]
+            else:
+                data_return = None
+            packet = self.data_packet.get_data_packet(
+                data["type"], data["to"], data["from"], data_return
+            )
+            if data_type == self.data_packet.TYPE_DATA_SEND:
+                self.last_send_packet[to_server_id] = packet
+                await self._send(
+                    self.data_packet.get_data_packet(
+                        self.data_packet.TYPE_DATA_SENDOK,
+                        data["from"],
+                        self.data_packet.DEFAULT_SERVER,
+                        None,
+                    ),
+                    self.websockets[server_id],
+                    server_id,
+                )
+            await self._send(
+                packet,
+                self.websockets[to_server_id],
+                to_server_id,
+            )
 
     # ========== Tools ==========
     def _generate_random_id(self, n: int) -> str:
