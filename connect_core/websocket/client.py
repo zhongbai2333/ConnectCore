@@ -5,16 +5,10 @@ import json
 import asyncio
 import websockets
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
-from connect_core.tools import restart_program, new_thread, auto_trigger
-from connect_core.websocket.data_packet import DataPacket
-from connect_core.plugin.init_plugin import (
-    new_connect,
-    del_connect,
-    connected,
-    disconnected,
-    recv_data,
-    recv_file,
-)
+from connect_core.tools import new_thread, auto_trigger
+from connect_core.websocket.data_packet import ClientDataPacket
+from connect_core.plugin.init_plugin import connected, disconnected
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,11 +34,8 @@ class WebsocketClient(object):
         self._main_task = None  # 主任务协程
         self._receive_task = None  # 接收任务协程
         self.server_id = None  # 服务器 ID
-        self.sid = 2  # 数据包编号
-        self.server_list = []  # 服务器列表
         self.last_data_packet = None  # 上一个发送的一个数据包
-        self.data_packet = DataPacket()  # 数据包处理类
-        self._wait_file = None  # 等待接收的文件
+        self.data_packet = ClientDataPacket(_control_interface, self)  # 数据包处理类
 
     # ===========
     #   Control
@@ -153,7 +144,7 @@ class WebsocketClient(object):
         初始连接时会向服务器发送连接状态消息。
         """
         if self._config["account"] != "-----":
-            await self._send(
+            await self.send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_LOGIN,
                     self.data_packet.DEFAULT_SERVER,
@@ -162,7 +153,7 @@ class WebsocketClient(object):
                 )
             )
         else:
-            await self._send(
+            await self.send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_REGISTER,
                     self.data_packet.DEFAULT_SERVER,
@@ -191,7 +182,7 @@ class WebsocketClient(object):
     # ============
     #   Send Msg
     # ============
-    async def _send(
+    async def send(
         self, data: dict, account: str = None
     ) -> None:
         """
@@ -224,8 +215,8 @@ class WebsocketClient(object):
     async def _trigger_websocket_client(self) -> None:
         # 如果有上一个数据包，则发送上一个数据包
         if self.last_data_packet:
-            await self._send(self.last_data_packet)
-        await self._send(
+            await self.send(self.last_data_packet)
+        await self.send(
             self.data_packet.get_data_packet(
                 self.data_packet.TYPE_PING,
                 self.data_packet.DEFAULT_SERVER,
@@ -261,7 +252,7 @@ class WebsocketClient(object):
             data,
         )
         self.last_data_packet = msg
-        await self._send(msg)
+        await self.send(msg)
 
     @new_thread("SendFile")
     async def send_file_to_other_server(
@@ -286,7 +277,7 @@ class WebsocketClient(object):
             file_hash = self.data_packet.get_file_hash(file_path)
             if os.path.basename(file_path) != os.path.basename(save_path):
                 save_path = os.path.join(file_path, os.path.basename(file_path))
-            await self._send(
+            await self.send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_FILE_SEND,
                     (t_server_id, t_plugin_id),
@@ -304,7 +295,7 @@ class WebsocketClient(object):
             with open(file_path, "rb") as file:
                 chunk_size = 1024 * 1024  # 每次发送 1 MB
                 while chunk := file.read(chunk_size):
-                    await self._send(
+                    await self.send(
                         self.data_packet.get_data_packet(
                             self.data_packet.TYPE_FILE_SENDING,
                             (t_server_id, t_plugin_id),
@@ -315,7 +306,7 @@ class WebsocketClient(object):
                         t_server_id,
                     )
                     await asyncio.sleep(0.1)  # 控制发送间隔（可选）
-            await self._send(
+            await self.send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_FILE_SENDOK,
                     (t_server_id, t_plugin_id),
@@ -343,169 +334,7 @@ class WebsocketClient(object):
         Args:
             data (dict): 从服务器接收到的消息内容。
         """
-        data_type = tuple(data["type"])
-        self.data_packet.add_recv_packet("-----", data)
-        _control_interface.debug(
-            f"[R][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
-        )
-        match data_type:
-            # Control 数据包
-            case self.data_packet.TYPE_CONTROL_STOP:
-                pass
-
-            # Register 数据包
-            case self.data_packet.TYPE_REGISTERED:
-                if self.data_packet.verify_md5_checksum(
-                    data["data"]["payload"], data["data"]["checksum"]
-                ):
-                    self._config["account"] = data["to"][0]
-                    self._config["password"] = data["data"]["payload"]["password"]
-                    _control_interface.save_config(self._config)
-                    restart_program()
-                else:
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_REGISTER_ERROR,
-                            self.data_packet.DEFAULT_SERVER,
-                            self.data_packet.DEFAULT_TO_FROM,
-                            None,
-                        )
-                    )
-            case self.data_packet.TYPE_REGISTER_ERROR:
-                _control_interface.error(f"Register Error: {data["data"]["payload"]}")
-                self.stop_server()
-
-            # Login 数据包
-            case self.data_packet.TYPE_LOGINED:
-                os.system(f"title ConnectCore Client {data["to"][0]}")
-                self.server_id = data["to"][0]
-                self._start_trigger_websocket_client()
-            case self.data_packet.TYPE_NEW_LOGIN:
-                # NewLogin 数据包
-                new_connect(data["data"]["payload"]["server_list"])
-            case self.data_packet.TYPE_DEL_LOGIN:
-                # DelLogin 数据包
-                del_connect(data["data"]["payload"]["server_list"])
-            case self.data_packet.TYPE_LOGIN_ERROR:
-                _control_interface.error(f"Login Error: {data["data"]["payload"]["error"]}")
-                self.stop_server()
-
-            # Data 数据包
-            case self.data_packet.TYPE_DATA_SEND:
-                # Send 数据包
-                if data["data"] and self.data_packet.verify_md5_checksum(
-                    data["data"]["payload"], data["data"]["checksum"]
-                ):
-                    if not data["data"]:
-                        data["data"]["payload"] = {}
-                    recv_data(data["to"][1], data["data"]["payload"])
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_DATA_SENDOK,
-                            self.data_packet.DEFAULT_SERVER,
-                            (self.server_id, data["to"][1]),
-                            None,
-                        )
-                    )
-                else:
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_DATA_ERROR,
-                            self.data_packet.DEFAULT_SERVER,
-                            (self.server_id, data["to"][1]),
-                            {"to": data["to"]},
-                        )
-                    )
-            case self.data_packet.TYPE_DATA_SENDOK:
-                # SendOK 数据包
-                self.last_data_packet = None
-            case self.data_packet.TYPE_DATA_ERROR:
-                # Error 数据包
-                await self._send(self.last_data_packet)
-
-            # File 数据包
-            case self.data_packet.TYPE_FILE_SEND:
-                if self.data_packet.verify_md5_checksum(
-                    data["data"]["payload"], data["data"]["checksum"]
-                ):
-                    self._wait_file = open(data["data"]["payload"]["save_path"], "wb")
-                else:
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_FILE_ERROR,
-                            data["from"],
-                            self.data_packet.DEFAULT_SERVER,
-                            {"to": data["to"]},
-                        )
-                    )
-            case self.data_packet.TYPE_FILE_SENDING:
-                if self.data_packet.verify_md5_checksum(
-                    data["data"]["payload"], data["data"]["checksum"]
-                ):
-                    if self._wait_file:
-                        self._wait_file_list.write(data["data"]["payload"]["file"])
-                        self._wait_file_list.flush()
-                    else:
-                        await self._send(
-                            self.data_packet.get_data_packet(
-                                self.data_packet.TYPE_FILE_ERROR,
-                                data["from"],
-                                self.data_packet.DEFAULT_SERVER,
-                                {"to": data["to"]},
-                            )
-                        )
-                else:
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_FILE_ERROR,
-                            data["from"],
-                            self.data_packet.DEFAULT_SERVER,
-                            {"to": data["to"]},
-                        )
-                    )
-            case self.data_packet.TYPE_FILE_SENDOK:
-                if self.data_packet.verify_md5_checksum(
-                    data["data"]["payload"], data["data"]["checksum"]
-                ):
-                    if self._wait_file_list:
-                        self._wait_file_list.close()
-                        if self.data_packet.verify_file_hash(
-                            data["data"]["payload"]["save_path"],
-                            data["data"]["payload"]["hash"],
-                        ):
-                            recv_file(
-                                    data["from"][1], data["data"]["payload"]["save_path"]
-                                )
-                        else:
-                            await self._send(
-                                self.data_packet.get_data_packet(
-                                    self.data_packet.TYPE_FILE_ERROR,
-                                    data["from"],
-                                    self.data_packet.DEFAULT_SERVER,
-                                    {"to": data["to"]},
-                                )
-                            )
-                    else:
-                        await self._send(
-                            self.data_packet.get_data_packet(
-                                self.data_packet.TYPE_FILE_ERROR,
-                                data["from"],
-                                self.data_packet.DEFAULT_SERVER,
-                                {"to": data["to"]},
-                            )
-                        )
-                else:
-                    await self._send(
-                        self.data_packet.get_data_packet(
-                            self.data_packet.TYPE_FILE_ERROR,
-                            data["from"],
-                            self.data_packet.DEFAULT_SERVER,
-                            {"to": data["to"]},
-                        )
-                    )
-
-            case _:
-                pass
+        await self.data_packet.parse_msg(data)
 
     # =========
     #   Tools
