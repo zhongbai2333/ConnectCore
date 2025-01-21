@@ -325,7 +325,7 @@ class ServerDataPacket(DataPacket):
                 data["type"], data["to"], data["from"], data_return, [server_id]
             )
             if data_type == self.TYPE_DATA_SEND:
-                self.last_send_packet.update(packet)
+                self._websocket_server.last_send_packet.update(packet)
             await self._broadcast(packet)
 
         match data_type:
@@ -360,10 +360,10 @@ class ServerDataPacket(DataPacket):
             data["type"], data["to"], data["from"], data_return
         )
         if data_type == self.TYPE_DATA_SEND:
-            self.last_send_packet[to_server_id] = packet
-            await self._send_acknowledgement(data, websocket, server_id)
-        await self._send(
-            packet, self._websocket_server.websockets[to_server_id], to_server_id
+            self._websocket_server.last_send_packet[to_server_id] = packet
+            await self._send_acknowledgement(websocket, server_id)
+        await self._return_send_packet(
+            data, self._websocket_server.websockets[to_server_id], to_server_id
         )
 
     async def _handle_ping(self, data, websocket, server_id):
@@ -480,6 +480,27 @@ class ServerDataPacket(DataPacket):
         accounts = _control_interface.get_config("account.json")
         accounts[server_id] = password
         _control_interface.save_config(accounts, "account.json")
+
+    async def _send_acknowledgement(self, websocket, server_id):
+        await self._send(
+            self.get_data_packet(
+                self.TYPE_DATA_SENDOK, (server_id, "system"), self.DEFAULT_SERVER, None
+            ),
+            websocket,
+            server_id,
+        )
+
+    async def _return_send_packet(self, data, to_websocket, to_server_id):
+        await self._send(
+            self.get_data_packet(
+                data["type"],
+                data["to"],
+                data["from"],
+                data["data"].get("payload", None),
+            ),
+            to_websocket,
+            to_server_id,
+        )
 
     async def _send_registration_response(self, websocket, server_id, password):
         await self._send(
@@ -631,7 +652,7 @@ class ClientDataPacket(DataPacket):
                 await self._handle_login_error(data)
             case self.TYPE_DATA_SEND:
                 await self._handle_data_send(data)
-            case self.TYPE_FILE_SENDOK:
+            case self.TYPE_DATA_SENDOK:
                 await self._handle_data_sendok(data)
             case self.TYPE_DATA_ERROR:
                 await self._handle_data_error(data)

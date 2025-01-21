@@ -353,6 +353,11 @@ class WebsocketServer(object):
     def _start_resend(self) -> None:
         """启动PING PONG数据包服务"""
         asyncio.run(self._resend())
+    
+    def get_history_data_packet(self, server_id) -> list:
+        """获取历史数据包"""
+        if server_id in self.websockets.keys():
+            return self.data_packet.get_history_packet(server_id, 0)
 
 
 # public
@@ -390,3 +395,8 @@ def send_file(
             f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
         )
     )
+
+
+def get_history_data_packet(server_id) -> list:
+    """获取历史数据包"""
+    return websocket_server.get_history_data_packet(server_id)

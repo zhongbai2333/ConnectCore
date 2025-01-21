@@ -252,3 +252,25 @@ class PluginControlInterface(CoreControlInterface):
             return None
         else:
             return get_server_id()
+    
+    def get_history_packet(self, server_id: str = None) -> list | None:
+        """
+        获取历史数据包，客户端无需参数
+
+        Args:
+            server_id (str): 服务器ID
+
+        Returns:
+            dict: 数据包
+        """
+        if self._is_server:
+            from connect_core.websocket.server import get_history_data_packet
+
+            if server_id:
+                return get_history_data_packet(server_id)
+            else:
+                return None
+        else:
+            from connect_core.websocket.client import get_history_data_packet
+
+            return get_history_data_packet()

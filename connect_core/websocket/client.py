@@ -344,6 +344,10 @@ class WebsocketClient(object):
         """启动PING PONG数据包服务"""
         asyncio.run(self._trigger_websocket_client())
 
+    def get_history_data_packet(self) -> list:
+        """获取历史数据包"""
+        return self.data_packet.get_history_packet("-----", 0)
+
 
 # Public
 @new_thread("Websocket_Client")
@@ -410,3 +414,8 @@ def get_server_id() -> str:
         str: 服务器ID
     """
     return websocket_client.server_id
+
+
+def get_history_data_packet() -> list:
+    """获取历史数据包"""
+    return websocket_client.get_history_data_packet()
