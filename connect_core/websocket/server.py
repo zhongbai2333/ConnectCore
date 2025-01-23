@@ -130,7 +130,7 @@ class WebsocketServer(object):
         """
         if account not in accounts and account != "-----":
             raise ValueError(f"Unknown account: {account}")
-        
+
         key = get_register_password() if account == "-----" else accounts[account]
         try:
             return json.loads(aes_decrypt(msg["data"], key))
@@ -227,7 +227,6 @@ class WebsocketServer(object):
                 msg[t_server_id], self.websockets[t_server_id], t_server_id
             )
 
-    @new_thread("SendFile")
     async def send_file_to_other_server(
         self,
         f_server_id: str,
@@ -285,7 +284,7 @@ class WebsocketServer(object):
                                 self.data_packet.TYPE_FILE_SENDING,
                                 (t_server_id, t_plugin_id),
                                 (f_server_id, f_plugin_id),
-                                {"file": chunk},
+                                {"file": chunk.hex()},
                             ),
                             except_id,
                         )
@@ -295,7 +294,7 @@ class WebsocketServer(object):
                                 self.data_packet.TYPE_FILE_SENDING,
                                 (t_server_id, t_plugin_id),
                                 (f_server_id, f_plugin_id),
-                                {"file": chunk},
+                                {"file": chunk.hex()},
                             ),
                             self.websockets[t_server_id],
                             t_server_id,
@@ -353,7 +352,7 @@ class WebsocketServer(object):
     def _start_resend(self) -> None:
         """启动PING PONG数据包服务"""
         asyncio.run(self._resend())
-    
+
     def get_history_data_packet(self, server_id) -> list:
         """获取历史数据包"""
         if server_id in self.websockets.keys():
@@ -381,6 +380,7 @@ def send_data(
     )
 
 
+@new_thread("SendFile")
 def send_file(
     f_server_id: str,
     f_plugin_id: str,

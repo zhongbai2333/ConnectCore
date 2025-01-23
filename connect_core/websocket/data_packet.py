@@ -357,13 +357,13 @@ class ServerDataPacket(DataPacket):
     ):
         data_return = data["data"].get("payload") if data["data"] else None
         packet = self.get_data_packet(
-            data["type"], data["to"], data["from"], data_return
+            tuple(data["type"]), tuple(data["to"]), tuple(data["from"]), data_return
         )
         if data_type == self.TYPE_DATA_SEND:
             self._websocket_server.last_send_packet[to_server_id] = packet
             await self._send_acknowledgement(websocket, server_id)
         await self._return_send_packet(
-            data, self._websocket_server.websockets[to_server_id], to_server_id
+            packet, self._websocket_server.websockets[to_server_id], to_server_id
         )
 
     async def _handle_ping(self, data, websocket, server_id):
@@ -411,7 +411,7 @@ class ServerDataPacket(DataPacket):
         if not data["data"].get("payload", None) or self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
-            recv_data(data["to"][1], data["data"].get("payload", None))
+            recv_data(data["to"][1], data["to"][0], data["data"].get("payload", None))
             await self._send_data_response(websocket, server_id)
         else:
             await self._send_data_error(websocket, server_id)
@@ -438,7 +438,7 @@ class ServerDataPacket(DataPacket):
         ):
             if server_id in self._wait_file_list:
                 self._wait_file_list[server_id].write(
-                    data["data"].get("payload")["file"]
+                    bytes.fromhex(data["data"].get("payload")["file"])
                 )
                 self._wait_file_list[server_id].flush()
             else:
@@ -459,6 +459,7 @@ class ServerDataPacket(DataPacket):
                 ):
                     recv_file(
                         data["to"][1],
+                        data["to"][0],
                         data["data"].get("payload")["save_path"],
                     )
                 else:
@@ -492,12 +493,7 @@ class ServerDataPacket(DataPacket):
 
     async def _return_send_packet(self, data, to_websocket, to_server_id):
         await self._send(
-            self.get_data_packet(
-                data["type"],
-                data["to"],
-                data["from"],
-                data["data"].get("payload", None),
-            ),
+            data,
             to_websocket,
             to_server_id,
         )
@@ -697,7 +693,7 @@ class ClientDataPacket(DataPacket):
         if not data["data"].get("payload", None) or self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
-            recv_data(data["to"][1], data["data"].get("payload", None))
+            recv_data(data["to"][1], data["to"][0], data["data"].get("payload", None))
             await self._send_data_response()
         else:
             await self._send_data_error()
@@ -721,7 +717,9 @@ class ClientDataPacket(DataPacket):
             data["data"].get("payload"), data["data"].get("checksum")
         ):
             if self._wait_file:
-                self._wait_file.write(data["data"].get("payload")["file"])
+                self._wait_file.write(
+                    bytes.fromhex(data["data"].get("payload")["file"])
+                )
                 self._wait_file.flush()
             else:
                 await self._send_file_error()
@@ -741,6 +739,7 @@ class ClientDataPacket(DataPacket):
                 ):
                     recv_file(
                         data["to"][1],
+                        data["to"][0],
                         data["data"].get("payload")["save_path"],
                     )
                 else:

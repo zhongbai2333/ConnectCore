@@ -158,11 +158,11 @@ class PluginLoader:
     def disconnected(self):
         self.handle_event("disconnected")
 
-    def recv_data(self, plugin_id: str, data: dict):
-        self.handle_event("recv_data", plugin_id, data)
+    def recv_data(self, plugin_id: str, from_server_id: str, data: dict):
+        self.handle_event("recv_data", plugin_id, from_server_id, data)
 
-    def recv_file(self, plugin_id, file_path: str):
-        self.handle_event("recv_file", plugin_id, file_path)
+    def recv_file(self, plugin_id, from_server_id: str, file_path: str):
+        self.handle_event("recv_file", plugin_id, from_server_id, file_path)
 
 
 # Public
@@ -212,26 +212,28 @@ def disconnected():
     _plugin_loader.disconnected()
 
 
-def recv_data(sid: str, data: dict):
+def recv_data(sid: str, from_server_id: str, data: dict):
     """
     收到数据包
 
     Args:
         sid (str): 插件ID
+        from_server_id (str): 来自的服务器ID
         data (dict): 收到的数据
     """
-    _plugin_loader.recv_data(sid, data)
+    _plugin_loader.recv_data(sid, from_server_id, data)
 
 
-def recv_file(sid: str, file: str):
+def recv_file(sid: str, from_server_id: str, file: str):
     """
     收到文件
 
     Args:
         sid (str): 插件ID
+        from_server_id (str): 来自的服务器ID
         file (str): 收到的文件地址
     """
-    _plugin_loader.recv_file(sid, file)
+    _plugin_loader.recv_file(sid, from_server_id, file)
 
 
 def unload_plugin(sid: str):

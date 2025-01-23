@@ -128,6 +128,7 @@ class WebsocketClient(object):
                         + str(e)
                     )
                     os.system(f"title ConnectCore Client")
+                    self._start_trigger_websocket_client.stop()
                     disconnected()
                     websocket_client_main(_control_interface)
                     return
@@ -254,7 +255,6 @@ class WebsocketClient(object):
         self.last_data_packet = msg
         await self.send(msg)
 
-    @new_thread("SendFile")
     async def send_file_to_other_server(
         self,
         f_plugin_id: str,
@@ -287,9 +287,7 @@ class WebsocketClient(object):
                         "save_path": save_path,
                         "hash": file_hash,
                     },
-                ),
-                self.websockets[t_server_id],
-                t_server_id,
+                )
             )
             # 读取文件并分块发送数据
             with open(file_path, "rb") as file:
@@ -300,10 +298,8 @@ class WebsocketClient(object):
                             self.data_packet.TYPE_FILE_SENDING,
                             (t_server_id, t_plugin_id),
                             (self.server_id, f_plugin_id),
-                            {"file": chunk},
-                        ),
-                        self.websockets[t_server_id],
-                        t_server_id,
+                            {"file": chunk.hex()},
+                        )
                     )
                     await asyncio.sleep(0.1)  # 控制发送间隔（可选）
             await self.send(
@@ -316,9 +312,7 @@ class WebsocketClient(object):
                         "save_path": save_path,
                         "hash": file_hash,
                     },
-                ),
-                self.websockets[t_server_id],
-                t_server_id,
+                )
             )
         except Exception as e:
             _control_interface.error(f"Send File Error: {e}")
@@ -382,6 +376,7 @@ def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) 
     )
 
 
+@new_thread("SendFile")
 def send_file(
     f_plugin_id: str,
     t_server_id: str,
