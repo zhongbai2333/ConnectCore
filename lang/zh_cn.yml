@@ -2,7 +2,9 @@ connect_core:
   cli:
     initialization_config:
       enter_ip: "请输入服务器IP/域名(公网): [127.0.0.1] "
+      invalid_ip: "无效的IP地址，请重新输入。"
       enter_port: "请输入服务器端口: [23233] "
+      invalid_port: "无效的端口，请重新输入。"
       enter_key: "请输入初始化密钥: "
       finish: "已将配置文件保存至 config.json"
     starting:
@@ -28,3 +30,20 @@ connect_core:
     cant_load: "无法加载插件 {} , 可能没有与ConnectCore兼容！"
     cant_initialize : "插件 {} 没有初始化函数"
     unload_finish: "插件 {} 已卸载！"
+  mcdr:
+    plugin_loaded: "插件 {} 加载成功！"
+    config_need_be_initialized: "配置文件需要先初始化才能使用！请使用命令 !!connectcore init"
+    config_already_initialized: "配置文件已经初始化过了！"
+    config_loaded: "配置文件加载成功！"
+    command_not_found: "未找到参数 {} !"
+    enter_server_or_client: "请输入服务器或客户端模式: [!!connectcore mode server/client]"
+    enter_server_or_client_first: "请先选择服务器模式: [!!connectcore mode server/client]"
+    enter_ip: "请输入服务器IP/域名(公网): [!!connectcore ip 127.0.0.1] "
+    invalid_ip: "无效的IP地址！"
+    enter_ip_first: "请先设置服务器IP/域名: [!!connectcore ip 127.0.0.1] "
+    enter_port: "请输入服务器端口: [!!connectcore port 23233] "
+    invalid_port: "无效的端口！"
+    enter_key: "请输入初始化密钥: [!!connectcore key your_secret_key]"
+    enter_key_first: "请先设置初始化密钥: [!!connectcore key your_secret_key]"
+    finish: "已将配置文件保存至 config/connect_core/config.json"
+

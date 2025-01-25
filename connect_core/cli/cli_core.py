@@ -1,5 +1,4 @@
 import time
-import threading
 from connect_core.websocket.server import websocket_server_main
 from connect_core.websocket.client import websocket_client_main
 from connect_core.aes_encrypt import aes_main
@@ -32,8 +31,8 @@ class Server(object):
 
                         self._control_interface.info(
                             self._control_interface.tr(
-                                "cli.starting.welcome_password"
-                            ).format(get_password())
+                                "cli.starting.welcome_password", get_password()
+                            )
                         )
                     else:
                         self._control_interface.error("Unkown Command!")
@@ -61,8 +60,8 @@ class Client(object):
         self._control_interface = CoreControlInterface()
         _config = self._control_interface.get_config()
         self._control_interface.info(
-            self._control_interface.tr("cli.starting.welcome_password").format(
-                _config["password"]
+            self._control_interface.tr(
+                "cli.starting.welcome_password", _config["password"]
             )
         )
 

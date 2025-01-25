@@ -1,27 +1,25 @@
 from connect_core.log_system import LogSystem
 
+from mcdreforged.api.types import PluginServerInterface
+
 class CoreControlInterface:
     def __init__(self):
         import sys
-        from connect_core.cli.cli_entry import get_is_server
+        from connect_core.mcdr.mcdr_entry import get_mcdr
 
         self.sid = "connect_core"
         self.self_path = sys.argv[0]
-        self.config_path = "./config.json"
-        self._is_server = get_is_server()
-        self.log_system = LogSystem(
-            self.sid,
-            (
-                self.get_config()["debug"]
-                if "debug" in self.get_config().keys()
-                else False
-            ),
-        )
-        self.language = (
-            self.get_config()["language"]
-            if "language" in self.get_config().keys()
-            else "en_us"
-        )
+        self.__mcdr_server = get_mcdr()
+        if self.__mcdr_server:
+            self.config_path = "./config/connect_core/config.json"
+            self._is_server = self.get_config().get("is_server", False)
+        else:
+            from connect_core.cli.cli_entry import get_is_server
+
+            self._is_server = get_is_server()
+            self.config_path = "./config.json"
+            self.language = self.get_config().get("language", "en_us")
+        self.log_system = LogSystem(self.sid, self.get_config().get("debug", False))
 
     # =============
     #  Json Editer
@@ -57,39 +55,40 @@ class CoreControlInterface:
     # =============
     #   Translate
     # =============
-    def translate(self, key: str) -> str:
+    def translate(self, key: str, *args) -> str:
         """
         获取翻译项
 
         Args:
             key (str): 翻译文件关键字
+            *args (tuple): 字段插入内容
 
         Returns:
             str: 翻译文本
         """
         from connect_core.storage import YmlLanguage
-        from connect_core.mcdr.mcdr_entry import get_mcdr
 
-        if get_mcdr():
-            return self._tr(key)
+        if self.__mcdr_server:
+            return self._tr(key, *args)
         else:
             key_n = f"{self.sid}." + key
             key_n = key_n.split(".")
             return self._get_nested_value(
                 YmlLanguage(self.self_path, self.language).translate, key_n
-            )
+            ).format(*args)
 
-    def tr(self, key: str):
+    def tr(self, key: str, *args):
         """
         获取翻译项 | `translate函数的别称`
 
         Args:
             key (str): 翻译文件关键字
+            *args (tuple): 字段插入内容
 
         Returns:
             str: 翻译文本
         """
-        return self.translate(key)
+        return self.translate(key, *args)
 
     def _get_nested_value(self, data, keys_path, default=None):
         for key in keys_path:
@@ -99,10 +98,13 @@ class CoreControlInterface:
                 return default
         return data
 
-    def _tr(self, key: str) -> str:
-        from mcdreforged.api.all import ServerInterface
+    def _tr(self, key: str, *args) -> str:
+        try:
+            from mcdreforged.api.all import ServerInterface
 
-        return ServerInterface.si().tr(f"{self.sid}." + key)
+            return ServerInterface.si().tr(f"{self.sid}." + key, *args)
+        except ImportError:
+            pass
 
     # =============
     #   Log Print
@@ -143,15 +145,26 @@ class CoreControlInterface:
         """
         self.log_system.debug(str(msg))
 
+    # =========
+    #   Tools
+    # =========
+    def is_server(self) -> bool:
+        """
+        判断是否为服务器
+
+        Returns:
+            bool: 是/否
+        """
+        return self.is_server
+
 
 class PluginControlInterface(CoreControlInterface):
-    def __init__(self, sid: str, sinfo: dict, self_path: str, config_path: str):
+    def __init__(self, sid: str, self_path: str, config_path: str, mcdr: PluginServerInterface = None):
         """
         插件控制接口
 
         Args:
             sid (str): 插件ID
-            sinfo (dict): 插件Info
             self_path (str): 自身路径
             config_path (str): 配置文件路径
         """
@@ -159,17 +172,9 @@ class PluginControlInterface(CoreControlInterface):
         super().__init__()
 
         self.sid = sid
-        self.sinfo = sinfo
         self.self_path = self_path
         self.config_path = config_path
-        self.log_system = LogSystem(
-            self.sid,
-            (
-                self.get_config()["debug"]
-                if "debug" in self.get_config().keys()
-                else False
-            ),
-        )
+        self.log_system = LogSystem(self.sid, self.get_config().get("debug", False), mcdr=mcdr)
 
     # ========
     #   Send
@@ -228,17 +233,6 @@ class PluginControlInterface(CoreControlInterface):
     # =========
     #   Tools
     # =========
-    def is_server(self) -> bool:
-        """
-        判断是否为服务器
-
-        Returns:
-            bool: 是/否
-        """
-        from connect_core.cli.cli_entry import get_is_server
-
-        return get_is_server()
-
     def get_server_id(self) -> str:
         """
         客户端反馈服务器ID
@@ -252,7 +246,7 @@ class PluginControlInterface(CoreControlInterface):
             return None
         else:
             return get_server_id()
-    
+
     def get_history_packet(self, server_id: str = None) -> list | None:
         """
         获取历史数据包，客户端无需参数

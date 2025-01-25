@@ -91,7 +91,7 @@ class WebsocketServer(object):
 
     async def _process_message(self, msg: str, websocket, server_id: str) -> None:
         """处理接收到的消息并进行响应。
-        
+
         Args:
             msg (str): 收到的原始消息。
             websocket: WebSocket 对象。
@@ -108,23 +108,21 @@ class WebsocketServer(object):
             await websocket.close(reason="400")
             await self._close_connection(server_id, websocket)
         except Exception as e:
-            _control_interface.error(
-                f"Unexpected error during message processing: {e}"
-            )
+            _control_interface.error(f"Unexpected error during message processing: {e}")
             await websocket.close(reason="500")
             await self._close_connection(server_id, websocket)
 
     def _decrypt_message(self, msg: dict, account: str, accounts: dict) -> dict:
         """解密消息并返回解密后的数据。
-        
+
         Args:
             msg (dict): 接收到的原始消息。
             account (str): 当前账户名。
             accounts (dict): 配置中所有账户。
-        
+
         Returns:
             dict: 解密后的消息内容。
-        
+
         Raises:
             ValueError: 如果账户未知或消息解密失败。
         """
@@ -162,8 +160,8 @@ class WebsocketServer(object):
             )
             _control_interface.info(
                 _control_interface.tr(
-                    "net_core.service.disconnect_from_sub_websocket"
-                ).format(server_id)
+                    "net_core.service.disconnect_from_sub_websocket", server_id
+                )
             )
         else:
             _control_interface.warn(
@@ -223,9 +221,7 @@ class WebsocketServer(object):
             await self.broadcast(msg, except_id)
         else:
             self.last_send_packet[t_server_id] = msg
-            await self.send(
-                msg[t_server_id], self.websockets[t_server_id], t_server_id
-            )
+            await self.send(msg[t_server_id], self.websockets[t_server_id], t_server_id)
 
     async def send_file_to_other_server(
         self,
@@ -367,6 +363,12 @@ def websocket_server_main(control_interface: "CoreControlInterface"):
     _control_interface = control_interface
     websocket_server = WebsocketServer()
     websocket_server.start_server()
+
+
+def websocket_server_stop() -> None:
+    """停止 WebSocket 服务器。"""
+    if websocket_server is not None:
+        websocket_server.close_server()
 
 
 def send_data(

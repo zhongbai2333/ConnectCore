@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import json
@@ -60,12 +61,28 @@ def _initialization_config() -> None:
         ip = input(
             translate_temp["connect_core"]["cli"]["initialization_config"]["enter_ip"]
         )
+        while not re.match(r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", ip):
+            if not ip:
+                break
+            print(translate_temp["connect_core"]["cli"]["initialization_config"]["invalid_ip"])
+            ip = input(
+                translate_temp["connect_core"]["cli"]["initialization_config"][
+                    "enter_ip"
+                ]
+            )
         ip = ip if ip else "127.0.0.1"
 
         # 输入端口
         port = input(
             translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
         )
+        while not (0 <= port <= 65535):
+            if not port:
+                break
+            print(translate_temp["connect_core"]["cli"]["initialization_config"]["invalid_port"])
+            port = input(
+                translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
+            )
         port = int(port) if port else 23233
 
         print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])

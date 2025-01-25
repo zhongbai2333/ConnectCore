@@ -88,9 +88,7 @@ class WebsocketClient(object):
                 ) as self.websocket:
                     self.finish_start = True
                     _control_interface.info(
-                        _control_interface.tr(
-                            "net_core.service.connect_websocket"
-                        ).format("")
+                        _control_interface.tr("net_core.service.connect_websocket", "")
                     )
                     connected()
                     await self._receive()
@@ -183,9 +181,7 @@ class WebsocketClient(object):
     # ============
     #   Send Msg
     # ============
-    async def send(
-        self, data: dict, account: str = None
-    ) -> None:
+    async def send(self, data: dict, account: str = None) -> None:
         """
         向服务器发送消息。
 
@@ -357,6 +353,12 @@ def websocket_client_main(control_interface: "CoreControlInterface") -> None:
     global websocket_client
     websocket_client = WebsocketClient()
     websocket_client.start_server()
+
+
+def websocket_client_stop() -> None:
+    """停止 WebSocket 客户端"""
+    if websocket_client is not None:
+        websocket_client.stop_server()
 
 
 def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) -> None:

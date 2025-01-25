@@ -4,20 +4,14 @@ import time
 import base64
 import psutil
 import socket
-import functools
 import requests
+import functools
 import threading
 from typing import Optional, Union, Callable
 
-from mcdreforged.api.all import new_thread as mcdr_new_thread
-
-
-def is_running_in_mcdr():
-    return any(module.startswith("mcdreforged") for module in sys.modules)
-
-
-if not is_running_in_mcdr():
-
+try:
+    from mcdreforged.api.all import new_thread
+except ImportError:
     class FunctionThread(threading.Thread):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -56,12 +50,19 @@ if not is_running_in_mcdr():
             thread_name = arg
             return wrapper
 
-else:
-    # 如果运行在 MCDR 环境中，直接使用其 new_thread 实现
-    new_thread = mcdr_new_thread
-
 
 def auto_trigger(interval: float, thread_name: Optional[str] = None):
+    """
+    创建一个自动触发的装饰器。
+
+    Args:
+        interval (float): 触发间隔时间（秒）。
+        thread_name (Optional[str]): 线程名称，默认为函数名。
+
+    Returns:
+        Callable: 装饰后的函数。
+    """
+
     def decorator(func: Callable):
         stop_event = threading.Event()
 
@@ -72,7 +73,7 @@ def auto_trigger(interval: float, thread_name: Optional[str] = None):
                 else:
                     wrapped_func = new_thread(thread_name)(func)
                 wrapped_func(*args, **kwargs)
-                stop_event.wait(interval)
+                time.sleep(interval)
 
         @new_thread(f"{thread_name or func.__name__}_trigger_loop")
         def start_trigger(instance=None, *args, **kwargs):
@@ -99,11 +100,16 @@ def restart_program() -> None:
     """
     重启程序，使用当前的Python解释器重新执行当前脚本。
     """
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
+    from connect_core.mcdr.mcdr_entry import get_mcdr
+
+    if not get_mcdr():
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
+    else:
+        get_mcdr().reload_plugin("connect_core")
 
 
-def check_file_exists(file_path) -> bool:
+def check_file_exists(file_path: str) -> bool:
     """
     检查目录中的特定文件是否存在。
 
@@ -113,18 +119,19 @@ def check_file_exists(file_path) -> bool:
     Returns:
         bool: 如果文件存在则返回 True，否则返回 False
     """
-
-    # 检查文件是否存在且是一个文件
     return os.path.isfile(file_path)
 
 
-def append_to_path(path, filename) -> str:
+def append_to_path(path: str, filename: str) -> str:
     """
-    Appends a filename to the given path if it is a directory.
+    将文件名附加到给定路径中，如果路径是一个目录的话。
 
-    :param path: The path to check and modify.
-    :param filename: The filename to append if path is a directory.
-    :return: The modified path.
+    Args:
+        path (str): 要检查和修改的路径。
+        filename (str): 如果路径是目录则附加的文件名。
+
+    Returns:
+        str: 修改后的路径。
     """
     if os.path.isdir(path):
         return os.path.join(path, filename)
@@ -137,7 +144,9 @@ def encode_base64(data: str) -> str:
 
     Args:
         data (str): 需要编码的字节数据
-    :return: 编码后的字符串
+
+    Returns:
+        str: 编码后的字符串
     """
     encoded_bytes = base64.b64encode(data.encode("utf-8"))
     return encoded_bytes.decode("utf-8")
@@ -148,8 +157,10 @@ def decode_base64(encoded_data: str) -> str:
     对Base64编码的数据进行解码
 
     Args:
-        encoded_data(str): Base64编码的字符串
-    :return: 解码后的字节数据
+        encoded_data (str): Base64编码的字符串
+
+    Returns:
+        str: 解码后的字节数据
     """
     decoded_bytes = base64.b64decode(encoded_data)
     return decoded_bytes.decode("utf-8")
@@ -158,10 +169,11 @@ def decode_base64(encoded_data: str) -> str:
 def get_all_internal_ips() -> list:
     """
     获取所有网卡的内网IP地址
-    :return: 一个列表, 包含所有内网IP地址
+
+    Returns:
+        list: 包含所有内网IP地址的列表
     """
     ip_addresses = []
-    # 获取所有网络接口的信息
     for interface, addrs in psutil.net_if_addrs().items():
         for addr in addrs:
             if addr.family == socket.AF_INET:  # 只获取IPv4地址
@@ -171,8 +183,10 @@ def get_all_internal_ips() -> list:
 
 def get_external_ip() -> str:
     """
-    获取公网地址
-    :return: 一个公网IP
+    获取公网IP地址
+
+    Returns:
+        str: 一个公网IP
     """
     response = requests.get("https://ifconfig.me/ip")
     return response.text.strip()

@@ -58,7 +58,6 @@ class PluginLoader:
                 # 创建 PluginControlInterface 并传递给插件的 on_load
                 plugin_control_interface = PluginControlInterface(
                     plugin_info["id"],
-                    plugin_info,
                     plugin_path,
                     f"config/{plugin_info['id']}/config.json",
                 )
@@ -66,14 +65,16 @@ class PluginLoader:
                 if hasattr(plugin_module, "on_load"):
                     plugin_module.on_load(plugin_control_interface)
                     _control_interface.info(
-                        _control_interface.tr("plugin.load_finish").format(
-                            plugin_info["name"], plugin_info["version"]
+                        _control_interface.tr(
+                            "plugin.load_finish",
+                            plugin_info["name"],
+                            plugin_info["version"],
                         )
                     )
                 else:
                     _control_interface.warn(
-                        _control_interface.tr("plugin.cant_initialize").format(
-                            plugin_info["name"]
+                        _control_interface.tr(
+                            "plugin.cant_initialize", plugin_info["name"]
                         )
                     )
 
@@ -86,7 +87,7 @@ class PluginLoader:
 
         except Exception as e:
             _control_interface.error(
-                _control_interface.tr("plugin.cant_load").format(plugin_info["name"])
+                _control_interface.tr("plugin.cant_load", plugin_info["name"])
             )
             _control_interface.error(traceback.format_exc())
 
@@ -100,8 +101,8 @@ class PluginLoader:
                 try:
                     plugin_module.on_unload()
                     _control_interface.info(
-                        _control_interface.tr("plugin.unload_finish").format(
-                            plugin["info"]["name"]
+                        _control_interface.tr(
+                            "plugin.unload_finish", plugin["info"]["name"]
                         )
                     )
                 except Exception as e:
@@ -119,8 +120,27 @@ class PluginLoader:
         """重载插件，先卸载再加载"""
         if plugin_id in self.plugins:
             self.unload(plugin_id)
-        plugin_file = self.plugins[plugin_id]["path"].split("/")[-1]
-        self.load_plugin(plugin_file)
+        if "path" in self.plugins[plugin_id].keys():
+            plugin_file = self.plugins[plugin_id]["path"].split("/")[-1]
+            self.load_plugin(plugin_file)
+        else:
+            from connect_core.mcdr.mcdr_entry import get_mcdr
+
+            get_mcdr().reload_plugin(plugin_id)
+
+    def mcdr_add_entry_point(self, sid: str, entry_point: str) -> bool:
+        """添加入口点"""
+        try:
+            self.plugins[sid] = {
+                "module": importlib.import_module(entry_point),
+            }
+            return True
+        except ImportError as e:
+            _control_interface.error(f"[{sid}] Import error: {e}")
+            return False
+        except Exception as e:
+            _control_interface.error(f"[{sid}] An error occurred: {e}")
+            return False
 
     def handle_event(self, event: str, plugin_id: str = None, *args):
         """处理插件事件，通知所有插件，如 new_connect, del_connect, recv_data 等"""
@@ -170,10 +190,22 @@ def init_plugin_main(control_interface: "CoreControlInterface"):
     """
     插件初始化
     """
+    from connect_core.mcdr.mcdr_entry import get_mcdr
+
     global _control_interface, _plugin_loader
     _control_interface = control_interface
-    _plugin_loader = PluginLoader("plugins/")
-    _plugin_loader.load_plugins()
+    if get_mcdr():
+        _plugin_loader = PluginLoader(
+            os.path.dirname(get_mcdr().get_plugin_file_path("connect_core"))
+        )
+    else:
+        _plugin_loader = PluginLoader("plugins/")
+        _plugin_loader.load_plugins()
+
+
+def mcdr_add_entry_point(sid: str, entry_point: str) -> bool:
+    """MCDR添加入口点"""
+    return _plugin_loader.mcdr_add_entry_point(sid, entry_point)
 
 
 def new_connect(server_list: list) -> None:
@@ -254,6 +286,7 @@ def reload_plugin(sid: str):
         sid (str): 插件ID
     """
     _plugin_loader.reload(sid)
+
 
 def get_plugins() -> dict:
     """

@@ -5,6 +5,7 @@ import threading
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit import print_formatted_text
 
+from mcdreforged.api.all import PluginServerInterface
 
 # 日志系统类
 class LogSystem:
@@ -14,6 +15,7 @@ class LogSystem:
         debug: bool = False,
         filelog: str = None,
         path: str = "logs/",
+        mcdr: PluginServerInterface | None = None,
     ) -> None:
         """
         初始化日志系统，创建日志文件夹和文件。
@@ -30,7 +32,7 @@ class LogSystem:
         if not filelog:
             filelog = f"Log-{time.strftime('%b_%d-%H_%M_%S', time.localtime())}.log"
         self.logfile = os.path.join(path, filelog)
-        self.mcdr_core = get_mcdr()
+        self.mcdr_core = mcdr if mcdr else get_mcdr()
         self.sid = sid
         self.debug_mode = debug
 
