@@ -26,8 +26,7 @@ def main():
         else:
             _display_help()
     else:
-        # TODO: DEBUG!!!
-        core_entry_init(False)
+        _display_help()
 
 
 # Public
