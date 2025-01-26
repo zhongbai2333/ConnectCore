@@ -1,15 +1,15 @@
 # 数据包格式
 
-```json
+```python
 {
-    "s": sID,                   // 数据包编号，确认数据发送正确
-    "type": ("TYPE", "STATUS"),             // 数据包类型标识符，定义见下文。
-    "to": ("SERVER_ID", "PLUGIN_ID"),       // 数据包目标
-    "from": ("SERVER_ID", "PLUGIN_ID"),     // 数据包来源
+    "s": sID,                               # 数据包编号，确认数据发送正确
+    "type": ("TYPE", "STATUS"),             # 数据包类型标识符，定义见下文。
+    "to": ("SERVER_ID", "PLUGIN_ID"),       # 数据包目标
+    "from": ("SERVER_ID", "PLUGIN_ID"),     # 数据包来源
     "data": {
-        "payload": Data,        // 数据载荷，内容根据数据包类型变化。
-        "timestamp": Timestamp, // 时间戳，用于标识数据发送的时间。
-        "checksum": Checksum    // 数据校验和，用于验证数据完整性。
+        "payload": Data,                    # 数据载荷，内容根据数据包类型变化。
+        "timestamp": Timestamp,             # 时间戳，用于标识数据发送的时间。
+        "checksum": Checksum                # 数据校验和，用于验证数据完整性。
     }
 }
 ```

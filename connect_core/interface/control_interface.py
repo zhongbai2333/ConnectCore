@@ -202,7 +202,7 @@ class PluginControlInterface(CoreControlInterface):
             client_send_data(self.sid, server_id, plugin_id, data)
 
     def send_file(
-        self, server_id: str, plugin_id: str, file_path: str, save_path: str = None
+        self, server_id: str, plugin_id: str, file_path: str, save_path: str
     ):
         """
         向指定的服务器发送文件。
