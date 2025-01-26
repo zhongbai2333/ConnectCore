@@ -101,7 +101,10 @@ class LogSystem:
             msg (str): 日志消息内容。
         """
         if self.mcdr_core:
-            getattr(self.mcdr_core.logger, level.lower())("".join(msg))
+            if level == "DEBUG":
+                self.mcdr_core.logger.info("[DEBUG] " + "".join(msg))
+            else:
+                getattr(self.mcdr_core.logger, level.lower())("".join(msg))
         else:
             self._log(level, "".join(msg))
 

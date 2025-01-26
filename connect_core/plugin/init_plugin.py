@@ -151,7 +151,7 @@ class PluginLoader:
                     getattr(plugin_module, event)(*args)  # 传递参数
                 except Exception as e:
                     _control_interface.error(
-                        f"Plugin {plugin['info']['name']} Error: \n{traceback.format_exc()}"
+                        f"Plugin {plugin_id} Error: \n{traceback.format_exc()}"
                     )
         else:
             for _, plugin in self.plugins.items():
@@ -162,7 +162,7 @@ class PluginLoader:
                         getattr(plugin_module, event)(*args)  # 传递参数
                     except Exception as e:
                         _control_interface.error(
-                            f"Plugin {plugin['info']['name']} Error: \n{traceback.format_exc()}"
+                            f"Plugin {plugin_id} Error: \n{traceback.format_exc()}"
                         )
 
     # 事件处理函数，通知所有插件

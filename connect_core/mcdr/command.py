@@ -24,6 +24,7 @@ class CommandActions(object):
         self.port = None
         self.key = None
         self.is_server = None
+        self.password = None
         self.builder = SimpleCommandBuilder()
         self.create_command()
 
@@ -102,10 +103,12 @@ class CommandActions(object):
                 print(f"Error: Can't Visit Server! {self.ip}, please check the IP address.")
                 return
             config = {
-            "is_server": self.is_server,
-            "ip": self.ip,
-            "port": self.port,
-            "debug": False,
+                "is_server": self.is_server,
+                "account": "-----",
+                "password": self.password,
+                "ip": self.ip,
+                "port": self.port,
+                "debug": False,
             }
             self._control_interface.save_config(config)
             self._control_interface.info(self._control_interface.tr("mcdr.finish"))
@@ -164,10 +167,13 @@ class CommandActions(object):
         else:
             print(f"Error: Can't Visit Server! {ip_list}")
             self.port = data["port"]
+            self.password = data["password"]
             self._control_interface.info(self._control_interface.tr("mcdr.enter_ip"))
             return
         config = {
             "is_server": self.is_server,
+            "account": "-----",
+            "password": data["password"],
             "ip": last_ip,
             "port": data["port"],
             "debug": False,

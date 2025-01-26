@@ -155,7 +155,7 @@ class CoreControlInterface:
         Returns:
             bool: 是/否
         """
-        return self.is_server
+        return self._is_server
 
 
 class PluginControlInterface(CoreControlInterface):

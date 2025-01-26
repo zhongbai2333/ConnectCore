@@ -103,7 +103,11 @@ class DataPacket(object):
                 "data": data,
             }
 
-            if sid != -1 and packet_type[0] != 0:
+            if (
+                sid != -1
+                and packet_type[0] != 0
+                and (to_info[0] != "-----" or not self._is_server)
+            ):
                 self._packet_list.setdefault(server_id, []).append(packet)
 
             packets[server_id] = packet
@@ -663,9 +667,11 @@ class ClientDataPacket(DataPacket):
         if self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
-            self._config["account"] = data["to"][0]
-            self._config["password"] = data["data"].get("payload")["password"]
-            _control_interface.save_config(self._config)
+            self._websocket_client.config["account"] = data["to"][0]
+            self._websocket_client.config["password"] = data["data"].get("payload")[
+                "password"
+            ]
+            _control_interface.save_config(self._websocket_client.config)
             restart_program()
         else:
             await self._send_register_error()

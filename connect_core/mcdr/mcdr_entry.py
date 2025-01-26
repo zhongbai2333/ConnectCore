@@ -1,3 +1,4 @@
+import time
 from mcdreforged.api.all import *
 from connect_core.interface.control_interface import (
     CoreControlInterface,
@@ -8,6 +9,7 @@ from connect_core.websocket.server import websocket_server_main, websocket_serve
 from connect_core.websocket.client import websocket_client_main, websocket_client_stop
 from connect_core.plugin.init_plugin import init_plugin_main, mcdr_add_entry_point
 from connect_core.account.register_system import register_system_main
+from connect_core.aes_encrypt import aes_main
 
 __mcdr_server, _control_interface = None, None
 
@@ -66,9 +68,11 @@ def on_load(server: PluginServerInterface, _):
         )
         config = _control_interface.get_config()
         if config["is_server"]:
+            aes_main(_control_interface)
             register_system_main(_control_interface)
             websocket_server_main(_control_interface)
         else:
+            aes_main(_control_interface, _control_interface.get_config()["password"])
             websocket_client_main(_control_interface)
 
 
@@ -83,6 +87,14 @@ def on_server_startup(_):
 def on_unload(_):
     # 插件卸载时执行的代码
     if _control_interface.get_config().get("is_server", False):
-        websocket_server_stop()
+        websocket_server = websocket_server_stop()
+        _control_interface.info("Waiting for the WebSocket server to close...")
+        while not websocket_server.finish_close:
+            time.sleep(0.5)
+        _control_interface.info("WebSocket server closed.")
     else:
-        websocket_client_stop()
+        websocket_client = websocket_client_stop()
+        _control_interface.info("Waiting for the WebSocket client to close...")
+        while not websocket_client.finish_close:
+            time.sleep(0.5)
+        _control_interface.info("WebSocket client closed.")

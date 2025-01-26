@@ -26,11 +26,11 @@ class WebsocketClient(object):
         """
         初始化 WebSocket 客户端的基本配置。
         """
-        self._config = _control_interface.get_config()
+        self.config = _control_interface.get_config()
         self.finish_start = False
         self.finish_close = False
-        self.host = self._config["ip"]  # 服务器 IP 地址
-        self.port = self._config["port"]  # 服务器端口
+        self.host = self.config["ip"]  # 服务器 IP 地址
+        self.port = self.config["port"]  # 服务器端口
         self._main_task = None  # 主任务协程
         self._receive_task = None  # 接收任务协程
         self.server_id = None  # 服务器 ID
@@ -142,12 +142,12 @@ class WebsocketClient(object):
         接收并处理从服务器发送的消息。
         初始连接时会向服务器发送连接状态消息。
         """
-        if self._config["account"] != "-----":
+        if self.config["account"] != "-----":
             await self.send(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_LOGIN,
                     self.data_packet.DEFAULT_SERVER,
-                    (self._config["account"], "system"),
+                    (self.config["account"], "system"),
                     {"path": sys.argv[0]},
                 )
             )
@@ -191,7 +191,7 @@ class WebsocketClient(object):
         """
         data = data["-----"]
         if account is None:
-            account = self._config["account"]
+            account = self.config["account"]
         _control_interface.debug(
             f"[S][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
         )
@@ -355,10 +355,13 @@ def websocket_client_main(control_interface: "CoreControlInterface") -> None:
     websocket_client.start_server()
 
 
-def websocket_client_stop() -> None:
+def websocket_client_stop() -> WebsocketClient | None:
     """停止 WebSocket 客户端"""
-    if websocket_client is not None:
+    try:
         websocket_client.stop_server()
+        return websocket_client
+    except NameError:
+        return None
 
 
 def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) -> None:

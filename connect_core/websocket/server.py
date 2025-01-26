@@ -365,10 +365,13 @@ def websocket_server_main(control_interface: "CoreControlInterface"):
     websocket_server.start_server()
 
 
-def websocket_server_stop() -> None:
+def websocket_server_stop() -> WebsocketServer | None:
     """停止 WebSocket 服务器。"""
-    if websocket_server is not None:
+    try:
         websocket_server.close_server()
+        return websocket_server
+    except NameError:
+        return None
 
 
 def send_data(
