@@ -3,9 +3,11 @@
 ## Account
 
 `connect_core.api.account`
+
 服务端密钥相关接口
 
  1. **analyze_password**
+
     解析初始化密钥
 
     **Args:**
@@ -26,7 +28,9 @@
     ```
 
  2. **get_password**
+
     获取初始化密钥
+
     **Returns:**
     >str: 密钥字符串
 
@@ -40,7 +44,9 @@
     ```
 
  3. **def get_register_password**
+
     获取初始化临时密钥
+
     **Returns:**
     >str: 密钥字符串
 
@@ -56,10 +62,13 @@
 ## Data Packet
 
 `connect_core.api.data_packet`
+
 数据包相关代码
 
  1. `Class` **DataPacket**
+
     数据包类，包含数据包的类型和内容
+
     预设的类型和内容：
 
     ```python
@@ -94,6 +103,7 @@
     详情见：[websocket.md](./websocket.md)。
 
  2. **DataPacket.get_data_packet**
+
     获取数据包格式
 
     **Args:**
@@ -122,6 +132,7 @@
     ```
 
  3. **DataPacket.get_history_packet**
+
     获取历史数据包
 
     **Args:**
@@ -144,7 +155,9 @@
     ```
 
  4. **DataPacket.add_recv_packet**
+
     添加接收到的数据包
+
     **Args:**
     >server_id (str): 服务器id
     >packet (dict): 数据包
@@ -161,7 +174,9 @@
     ```
 
  5. **DataPacket.del_server_id**
+
     删除指定服务器id的数据包
+
     **Args:**
     >server_id (str): 服务器id
 
@@ -176,7 +191,9 @@
     ```
 
  6. **DataPacket.get_file_hash**
+
     获取指定文件的哈希值。默认使用 'sha256' 算法。
+
     **Args:**
     >file_path (str): 文件路径
     >algorithm (str): 哈希算法，默认使用 'sha256'
@@ -199,7 +216,9 @@
     ```
 
  7. **DataPacket.verify_file_hash**
+
     验证指定文件的哈希值是否与预期的哈希值匹配。默认使用 'sha256' 算法。
+
     **Args:**
     >file_path (str): 文件路径
     >expected_hash (str): 预期的哈希值
@@ -224,7 +243,9 @@
     ```
 
  8. **DataPacket.generate_md5_checksum**
+
     验证文件的哈希值。
+
     **Args:**
     >data (bytes): 数据
 
@@ -246,7 +267,9 @@
     ```
 
  9. **DataPacket.verify_md5_checksum**
+
     校验数据是否匹配给定的 MD5 校验和。
+
     **Args:**
     >data (bytes): 数据
     >checksum (str): MD5 校验和
@@ -268,13 +291,17 @@
 ## Interface
 
 `connect_core.api.interface`
+
 控制器接口模块
 
  1. `Class` **ControlInterface**
+
     控制器接口类
 
  2. **ControlInterface.get_config**
+
     获取配置文件
+
     **Args:**
     >config_path (str): 配置文件路径，默认为插件或服务器默认 config 路径
 
@@ -295,7 +322,9 @@
     ```
 
  3. **ControlInterface.save_config**
+
     写入配置文件
+
     **Args:**
     >config_data (dict): 新的配置项字典
     >config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
@@ -312,7 +341,9 @@
     ```
 
  4. **ControlInterface.translate**
+
     获取翻译项
+
     **Args:**
     >key (str): 翻译文件关键字
     >*args (tuple): 字段插入内容
@@ -335,8 +366,11 @@
     ```
 
  5. **ControlInterface.tr**
+
     获取翻译项 | `translate函数的别称`
+
     **Args:**
+
     >key (str): 翻译文件关键字
     >*args (tuple): 字段插入内容
 
@@ -358,7 +392,9 @@
     ```
 
  6. **ControlInterface.info**
+
     输出INFO级别的日志信息
+
     **Args:**
     >msg (any): 日志消息内容。
 
@@ -373,7 +409,9 @@
     ```
 
  7. **ControlInterface.warn**
+
     输出WARN级别的日志信息
+
     **Args:**
     >msg (any): 日志消息内容。
 
@@ -388,7 +426,9 @@
     ```
 
  8. **ControlInterface.error**
+
     输出ERROR级别的日志信息
+
     **Args:**
     >msg (any): 日志消息内容。
 
@@ -403,7 +443,9 @@
     ```
 
  9. **ControlInterface.debug**
+
     输出DEBUG级别的日志信息
+
     **Args:**
     >msg (any): 日志消息内容。
 
@@ -417,9 +459,12 @@
         """
     ```
 
- 10. **ControlInterface.is_server**
+10. **ControlInterface.is_server**
+
     判断是否为服务器
+
     **Returns:**
+
     >bool: 是/否
 
     ```python
@@ -432,8 +477,10 @@
         """
     ```
 
- 11. `Class` **PluginControlInterface**
+11. `Class` **PluginControlInterface**
+
     插件控制接口
+
     **Args:**
     >sid (str): 插件ID
     >sinfo (dict): 插件Info
@@ -456,8 +503,10 @@
             super().__init__()
     ```
 
- 12. **PluginControlInterface.send_data**
+12. **PluginControlInterface.send_data**
+
     向指定的服务器发送消息。
+
     **Args:**
     >server_id (str): 目标服务器的唯一标识符。
     >plugin_id (str): 目标服务器插件的唯一标识符
@@ -476,8 +525,10 @@
         pass
     ```
 
- 13. **PluginControlInterface.send_file**
+13. **PluginControlInterface.send_file**
+
     向指定的服务器发送文件。
+
     **Args:**
     >server_id (str): 目标服务器的唯一标识符。
     >plugin_id (str): 目标服务器插件的唯一标识符
@@ -499,8 +550,10 @@
         """
     ```
 
- 14. **PluginControlInterface.get_server_id**
+14. **PluginControlInterface.get_server_id**
+
     获取客户端的服务器ID。
+
     **Returns:**
     >str: 服务器ID
 
@@ -514,10 +567,13 @@
         """
     ```
 
- 15. **PluginControlInterface.get_history_packet**
+15. **PluginControlInterface.get_history_packet**
+
     获取历史数据包。
+
     **Args:**
     >str: 服务器ID
+
     **Returns:**
     >dict: 数据包
 
@@ -537,10 +593,13 @@
 ## MCDR
 
 `connect_core.api.mcdr`
+
 MCDR插件的API。
 
 1. **get_plugin_control_interface**
+
     获取插件控制接口。
+
     **Args:**
     >sid (str): 服务器ID
     >enter_point (str): 入口点
@@ -568,10 +627,13 @@ MCDR插件的API。
 ## Plugin
 
 `connect_core.api.plugin`
+
 控制插件的API。
 
  1. **unload_plugin**
+
     卸载插件。
+
     **Args:**
     >sid (str): 服务器ID
 
@@ -586,7 +648,9 @@ MCDR插件的API。
     ```
 
  2. **reload_plugin**
+
     重载插件。
+
     **Args:**
     >sid (str): 服务器ID
 
@@ -601,7 +665,9 @@ MCDR插件的API。
     ```
 
  3. **get_plugins**
+
     获取插件列表。
+
     **Returns:**
     >dict: 插件列表
 
@@ -617,10 +683,13 @@ MCDR插件的API。
 ## RSA
 
 `connect_core.api.rsa`
+
 RSA加密模块。
 
  1. **rsa_encrypt**
+
     RSA加密数据。
+
     **Args:**
     >data (bytes): 要加密的数据。
 
@@ -647,7 +716,9 @@ RSA加密模块。
     ```
 
  2. **aes_decrypt**
+
     RSA解密数据。
+
     **Args:**
     >data (bytes): 要解密的数据。
 
@@ -676,9 +747,11 @@ RSA加密模块。
 ## Tools
 
 `connect_core.api.tools`
+
 实用工具
 
  1. **new_thread**
+
     启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
 
     ```python
@@ -689,6 +762,7 @@ RSA加密模块。
     ```
 
  2. **auto_trigger**
+
     定时启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
 
     ```python
@@ -699,6 +773,7 @@ RSA加密模块。
     ```
 
  3. **restart_program**
+
     重启程序，使用当前的Python解释器重新执行当前脚本。
 
     ```python
@@ -709,9 +784,12 @@ RSA加密模块。
     ```
 
  4. **check_file_exists**
+
     检查目录中的特定文件是否存在。
+
     **Args**:
     >file_path (str): 文件路径
+
     **Returns**:
     >bool: 如果文件存在则返回 True，否则返回 False
 
@@ -729,10 +807,13 @@ RSA加密模块。
     ```
 
  5. **append_to_path**
+
     如果给定的路径是一个目录，则将文件名附加到该路径上。
+
     **Args**:
     >path (str): 要检查和修改的路径。
     >filename (str): 如果路径是目录，则附加的文件名。
+
     **Returns**:
     >str: 修改后的路径。
 
@@ -747,9 +828,12 @@ RSA加密模块。
     ```
 
  6. **encode_base64**
+
     对输入的数据进行Base64编码。
+
     **Args**:
     >data (str): 需要编码的字节数据
+
     **Returns**:
     >str: 编码后的字符串。
 
@@ -765,9 +849,12 @@ RSA加密模块。
     ```
 
  7. **decode_base64**
+
     对Base64编码的数据进行解码。
+
     **Args**:
     >encoded_data (str): Base64编码的字符串
+
     **Returns**:
     >str: 解码后的字节数据。
 
@@ -783,7 +870,9 @@ RSA加密模块。
     ```
 
  8. **get_all_internal_ips**
+
     获取所有网卡的内网IP地址。
+
     **Returns**:
     >list: 一个列表, 包含所有内网IP地址
 
@@ -796,7 +885,9 @@ RSA加密模块。
     ```
 
  9. **get_external_ip**
+
     获取公网地址。
+
     **Returns**:
     >str: 一个公网IP
 
