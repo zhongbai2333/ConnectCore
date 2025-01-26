@@ -1,37 +1,48 @@
 connect_core:
   cli:
     initialization_config:
-      enter_ip: "Please enter the server IP/domain (Public): [127.0.0.1] "
+      enter_ip: "Please enter the server IP/domain (public): [127.0.0.1] "
+      invalid_ip: "Invalid IP address, please try again."
       enter_port: "Please enter the server port: [23233] "
-      enter_http_port: "Please enter the HTTP file server port: [4443] "
-      enter_password: "Please enter the group server key: [{}] "
-      finish: "Configuration saved to config.json, the program will restart in 3 seconds..."
+      invalid_port: "Invalid port, please try again."
+      enter_key: "Please enter the initialization key: "
+      finish: "Configuration file has been saved to config.json"
     starting:
-      welcome: "Please redirect the group to {}"
-      welcome_password: "The group key is {}"
-    server_commands:
-      help: "==help==\n
-      help: Get help list\n
-      send: Send a message or file\n
-      list: Get the sub-server list\n
-      exit: Exit"
-      send: "send <msg|file> <ID> <[msg]|[path]> Send a file or message"
-    client_commands:
-      help: "==help==\n
-      help: Get help list\n
-      info: Get server status\n
-      list: Get the sub-server list\n
-      exit: Exit"
+      welcome: "Please use \"getkey\" to retrieve the sub-server initialization key"
+      welcome_password: "Group key is: {}"
   net_core:
     service:
-      start_http: "HTTP file server started at {}"
       start_websocket: "Websocket started successfully!"
       connect_websocket: "Websocket connected successfully! {}"
       stop_websocket: "Websocket has been closed!"
       disconnect_websocket: "Disconnected from the main server, attempting to reconnect!"
-      stop_receive: "Receive service has exited!"
+      stop_receive: "Receive service has been stopped!"
       disconnect_from_sub_websocket: "Sub-server {} has disconnected from Main Websockets!"
-      disconnect_from_unknown_websocket: "Main Websockets disconnected an unknown connection!"
+      disconnect_from_unknown_websocket: "Main Websockets has disconnected from an unknown connection!"
       error_password: "Incorrect key! Please modify the key and reload the plugin!"
+      already_login: "A sub-server is already connected!"
+      sub_server_download_finish: "Sub-server {} has finished file download!"
+      file_download_finish_from_other: "File from server {} has been downloaded successfully! The file has been saved to {}"
   rsa:
     decrypt_error: "Decryption failed, incorrect key or data has been tampered with!"
+  plugin:
+    load_finish: "Plugin {} v{} loaded successfully!"
+    cant_load: "Unable to load plugin {}. It may not be compatible with ConnectCore!"
+    cant_initialize: "Plugin {} does not have an initialization function"
+    unload_finish: "Plugin {} has been unloaded!"
+  mcdr:
+    plugin_loaded: "Plugin {} loaded successfully!"
+    config_need_be_initialized: "The configuration file needs to be initialized first! Please use the command !!connectcore init"
+    config_already_initialized: "The configuration file has already been initialized!"
+    config_loaded: "Configuration file loaded successfully!"
+    command_not_found: "Parameter {} not found!"
+    enter_server_or_client: "Please enter server or client mode: [!!connectcore mode server/client]"
+    enter_server_or_client_first: "Please select server mode first: [!!connectcore mode server/client]"
+    enter_ip: "Please enter the server IP/domain (public): [!!connectcore ip 127.0.0.1] "
+    invalid_ip: "Invalid IP address!"
+    enter_ip_first: "Please set the server IP/domain first: [!!connectcore ip 127.0.0.1] "
+    enter_port: "Please enter the server port: [!!connectcore port 23233] "
+    invalid_port: "Invalid port!"
+    enter_key: "Please enter the initialization key: [!!connectcore key your_secret_key]"
+    enter_key_first: "Please set the initialization key first: [!!connectcore key your_secret_key]"
+    finish: "Configuration file has been saved to config/connect_core/config.json"
