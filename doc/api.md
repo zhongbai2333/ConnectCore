@@ -492,7 +492,6 @@
             command (str): 命令名称。
             func (callable): 命令对应的函数。
         """
-        pass
     ```
 
 12. **ControlInterface.remove_command**
@@ -510,7 +509,6 @@
         Args:
             command (str): 命令名称。
         """
-        pass
     ```
 
 13. **ControlInterface.set_prompt**
@@ -528,7 +526,6 @@
         Args:
             prompt (str): 命令行提示符内容。
         """
-        pass
     ```
 
 14. **ControlInterface.set_completer_words**
@@ -546,7 +543,6 @@
         Args:
             words (dict): 命令行补全词典内容。
         """
-        pass
     ```
 
 15. **ControlInterface.flush_cli**
@@ -558,7 +554,6 @@
         """
         清空命令行界面。
         """
-        pass
     ```
 
 16. `Class` **PluginControlInterface**
@@ -606,7 +601,6 @@
             plugin_id (str): 目标服务器插件的唯一标识符
             data (str): 要发送的数据。
         """
-        pass
     ```
 
 18. **PluginControlInterface.send_file**
