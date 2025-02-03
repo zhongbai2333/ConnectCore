@@ -370,7 +370,6 @@
     获取翻译项 | `translate函数的别称`
 
     **Args:**
-
     >key (str): 翻译文件关键字
     >*args (tuple): 字段插入内容
 
@@ -464,7 +463,6 @@
     判断是否为服务器
 
     **Returns:**
-
     >bool: 是/否
 
     ```python
@@ -477,9 +475,95 @@
         """
     ```
 
-11. `Class` **PluginControlInterface**
+11. **ControlInterface.add_command**
 
-    插件控制接口
+    添加命令到命令行界面中。
+
+    **Args:**
+    >command (str): 命令名称。
+    >func (callable): 命令对应的函数。
+
+    ```python
+    def add_command(self, command: str, func: callable):
+        """
+        添加命令到命令行界面中。
+
+        Args:
+            command (str): 命令名称。
+            func (callable): 命令对应的函数。
+        """
+        pass
+    ```
+
+12. **ControlInterface.remove_command**
+
+    移除命令从命令行界面中。
+
+    **Args:**
+    >command (str): 命令名称。
+
+    ```python
+    def remove_command(self, command: str):
+        """
+        移除命令从命令行界面中。
+
+        Args:
+            command (str): 命令名称。
+        """
+        pass
+    ```
+
+13. **ControlInterface.set_prompt**
+
+    设置命令行提示符。
+
+    **Args:**
+    >prompt (str): 命令行提示符内容。
+
+    ```python
+    def set_prompt(self, prompt: str):
+        """
+        设置命令行提示符。
+
+        Args:
+            prompt (str): 命令行提示符内容。
+        """
+        pass
+    ```
+
+14. **ControlInterface.set_completer_words**
+
+    设置命令行补全词典。
+
+    **Args:**
+    >words (dict): 命令行补全词典内容。
+
+    ```python
+    def set_completer_words(self, words: dict):
+        """
+        设置命令行补全词典。
+
+        Args:
+            words (dict): 命令行补全词典内容。
+        """
+        pass
+    ```
+
+15. **ControlInterface.flush_cli**
+
+    清空命令行界面。
+
+    ```python
+    def flush_cli(self):
+        """
+        清空命令行界面。
+        """
+        pass
+    ```
+
+16. `Class` **PluginControlInterface**
+
+    插件控制接口，继承自 `CoreControlInterface`。
 
     **Args:**
     >sid (str): 插件ID
@@ -503,7 +587,7 @@
             super().__init__()
     ```
 
-12. **PluginControlInterface.send_data**
+17. **PluginControlInterface.send_data**
 
     向指定的服务器发送消息。
 
@@ -525,7 +609,7 @@
         pass
     ```
 
-13. **PluginControlInterface.send_file**
+18. **PluginControlInterface.send_file**
 
     向指定的服务器发送文件。
 
@@ -550,7 +634,7 @@
         """
     ```
 
-14. **PluginControlInterface.get_server_id**
+19. **PluginControlInterface.get_server_id**
 
     获取客户端的服务器ID。
 
@@ -567,7 +651,7 @@
         """
     ```
 
-15. **PluginControlInterface.get_history_packet**
+20. **PluginControlInterface.get_history_packet**
 
     获取历史数据包。
 

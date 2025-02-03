@@ -1,4 +1,5 @@
 from connect_core.log_system import LogSystem
+from connect_core.cli.command_core import CommandLineInterface
 
 from mcdreforged.api.types import PluginServerInterface
 
@@ -20,6 +21,8 @@ class CoreControlInterface:
             self.config_path = "./config.json"
             self.language = self.get_config().get("language", "en_us")
         self.log_system = LogSystem(self.sid, self.get_config().get("debug", False))
+        self.command_core = CommandLineInterface(self)
+        self.command_core.start()
 
     # =============
     #  Json Editer
@@ -144,6 +147,52 @@ class CoreControlInterface:
             msg (any): 日志消息内容。
         """
         self.log_system.debug(str(msg))
+
+    # ============
+    #   Command
+    # ============
+    def add_command(self, command: str, func: callable):
+        """
+        添加命令到命令行界面中。
+        
+        Args:
+            command (str): 命令名称。
+            func (callable): 命令对应的函数。
+        """
+        self.command_core.add_command(self.sid, command, func)
+
+    def remove_command(self, command: str):
+        """
+        移除命令从命令行界面中。
+        
+        Args:
+            command (str): 命令名称。
+        """
+        self.command_core.remove_command(self.sid, command)
+
+    def set_prompt(self, prompt: str):
+        """
+        设置命令行提示符。
+        
+        Args:
+            prompt (str): 命令行提示符内容。
+        """
+        self.command_core.set_prompt(prompt)
+
+    def set_completer_words(self, words: dict):
+        """
+        设置命令行补全词典。
+        
+        Args:
+            words (dict): 命令行补全词典内容。
+        """
+        self.command_core.set_completer_words(self.sid, words)
+
+    def flush_cli(self):
+        """
+        清空命令行界面。
+        """
+        self.command_core.flush_cli()
 
     # =========
     #   Tools

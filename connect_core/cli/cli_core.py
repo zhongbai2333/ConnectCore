@@ -19,23 +19,21 @@ class Server(object):
         """
         程序持续运行
         """
+        def get_key() -> None:
+            self._control_interface.info(
+                self._control_interface.tr(
+                    "cli.starting.welcome_password", get_password()
+                )
+            )
+
         try:
             self._control_interface.info("Program is running. Press Ctrl+C to exit.")
+            self._control_interface.add_command("getkey", get_key)
+            self._control_interface.set_completer_words({"getkey": None})
+            self._control_interface.flush_cli()
 
             while True:
-                if "cli_core" in get_plugins().keys():
-                    time.sleep(1)
-                else:
-                    command = input()
-                    if command == "getkey":
-
-                        self._control_interface.info(
-                            self._control_interface.tr(
-                                "cli.starting.welcome_password", get_password()
-                            )
-                        )
-                    else:
-                        self._control_interface.error("Unkown Command!")
+                time.sleep(1)
         except KeyboardInterrupt:
             self._control_interface.info("\nCtrl+C detected. Exiting gracefully.")
 
