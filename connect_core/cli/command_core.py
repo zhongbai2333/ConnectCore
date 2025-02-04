@@ -6,17 +6,18 @@ from connect_core.tools import new_thread
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from connect_core.api.interface import PluginControlInterface
+    from connect_core.api.interface import CoreControlInterface
 
 
 # 命令行界面类
 class CommandLineInterface:
-    def __init__(self, interface: "PluginControlInterface", prompt: str = ">>> "):
+
+    def __init__(self, interface: "CoreControlInterface", prompt: str = ">>> "):
         """
         初始化命令行界面类，设置默认提示符和补全器。
 
         Args:
-            connect_interface (PluginControlInterface): API接口
+            connect_interface (CoreControlInterface): API接口
         """
         self.prompt = prompt
         self.completer = {}
@@ -56,14 +57,21 @@ class CommandLineInterface:
             action (callable): 执行该命令的函数。
         """
         commands = command.split()
-        self.commands.setdefault(sid, {})
-        for key in commands[:-1]:  # 迭代到倒数第二个元素，创建或找到路径
-            if key not in self.commands[sid]:
-                self.commands[sid][key] = {}  # 如果没有这个键，创建一个新的空字典
-            self.commands[sid] = self.commands[sid][key]
+
+        # 确保 sid 存在，并初始化为空字典
+        if sid not in self.commands:
+            self.commands[sid] = {}
+
+        cmd_dict = self.commands[sid]  # 先取得命令字典
+
+        # 遍历命令路径中的每一部分，逐级进入字典
+        for key in commands[:-1]:  # 遍历到倒数第二个元素，创建或找到路径
+            if key not in cmd_dict:
+                cmd_dict[key] = {}  # 如果没有这个键，创建一个新的空字典
+            cmd_dict = cmd_dict[key]  # 进入下一层级
 
         # 对于最后一个元素，赋予值
-        self.commands[sid][commands[-1]] = action
+        cmd_dict[commands[-1]] = action
 
     def remove_command(self, sid, command):
         """
@@ -136,7 +144,7 @@ class CommandLineInterface:
             if sid not in self.commands:
                 self.interface.warn(f"未知插件ID: {sid}")
                 return None
-            
+
             # 如果只输入了sid，没有其他命令，默认执行 sid help
             if not params:
                 params = ["help"]
@@ -150,13 +158,16 @@ class CommandLineInterface:
                 # 如果命令存在并且当前路径是字典
                 if isinstance(command, dict) and key in command:
                     command = command[key]
-                # 如果遇到占位符，进行替换
-                elif (
-                    isinstance(command, dict)
-                    and isinstance(command.get(key), str)
-                    and re.match(r"<.*>", key)
-                ):
-                    final_params.append(key.strip("<>"))  # 提取参数
+                # 如果遇到占位符，进行替换并提取参数
+                elif isinstance(command, dict):
+                    # 查找命令中带占位符的键
+                    for cmd_key in command.keys():
+                        match = re.match(r"<([^>]+)>", cmd_key)  # 匹配占位符
+                        if match:
+                            # 如果占位符匹配，则将用户输入的参数替换占位符
+                            final_params.append(key)  # 用实际值替换占位符
+                            command = command[cmd_key]  # 进入下一层字典
+                            break
                 else:
                     self.interface.warn(f"未知命令: {key}")
                     return None  # 如果路径不存在或某层不是字典，则返回 None
