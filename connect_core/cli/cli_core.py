@@ -4,7 +4,8 @@ from connect_core.websocket.client import websocket_client_main
 from connect_core.aes_encrypt import aes_main
 from connect_core.plugin.init_plugin import init_plugin_main
 from connect_core.interface.control_interface import CoreControlInterface
-from connect_core.account.register_system import register_system_main, get_password
+from connect_core.account.register_system import register_system_main
+from connect_core.cli.commands import ServerCommand, ClientCommand
 
 
 class Server(object):
@@ -18,19 +19,9 @@ class Server(object):
         """
         程序持续运行
         """
-        def get_key() -> None:
-            self._control_interface.info(
-                self._control_interface.tr(
-                    "cli.starting.welcome_password", get_password()
-                )
-            )
-
         try:
             self._control_interface.info("Program is running. Press Ctrl+C to exit.")
-            self._control_interface.add_command("getkey", get_key)
-            self._control_interface.set_completer_words({"getkey": None})
-            self._control_interface.flush_cli()
-
+            ServerCommand(self._control_interface)
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
@@ -70,6 +61,7 @@ class Client(object):
         """
         try:
             self._control_interface.info("Program is running. Press Ctrl+C to exit.")
+            ClientCommand(self._control_interface)
             while True:
                 time.sleep(1)  # 模拟程序的持续运行
         except KeyboardInterrupt:

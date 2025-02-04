@@ -360,7 +360,7 @@ def websocket_client_stop() -> WebsocketClient | None:
     try:
         websocket_client.stop_server()
         return websocket_client
-    except NameError:
+    except Exception:
         return None
 
 

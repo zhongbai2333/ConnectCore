@@ -268,6 +268,15 @@ def recv_file(sid: str, from_server_id: str, file: str):
     _plugin_loader.recv_file(sid, from_server_id, file)
 
 
+def load_plugin(plugin_file: str):
+    """
+    加载插件
+    Args:
+        plugin_file (str): 插件文件路径
+    """
+    _plugin_loader.load_plugin(plugin_file)
+
+
 def unload_plugin(sid: str):
     """
     卸载插件
