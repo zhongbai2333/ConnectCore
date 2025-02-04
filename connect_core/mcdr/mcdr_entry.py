@@ -57,23 +57,19 @@ def on_load(server: PluginServerInterface, _):
     __mcdr_server = server
     _control_interface = CoreControlInterface()
 
-    if not _control_interface.get_config():
-        CommandActions(__mcdr_server, _control_interface)
+    CommandActions(__mcdr_server, _control_interface)
+    init_plugin_main(_control_interface)
+    _control_interface.info(_control_interface.tr("mcdr.config_loaded"))
+    _control_interface.info(
+        _control_interface.tr("mcdr.plugin_loaded", "Connect Core")
+    )
+    if _control_interface.is_server():
+        aes_main(_control_interface)
+        register_system_main(_control_interface)
+        websocket_server_main(_control_interface)
     else:
-
-        init_plugin_main(_control_interface)
-        _control_interface.info(_control_interface.tr("mcdr.config_loaded"))
-        _control_interface.info(
-            _control_interface.tr("mcdr.plugin_loaded", "Connect Core")
-        )
-        config = _control_interface.get_config()
-        if config["is_server"]:
-            aes_main(_control_interface)
-            register_system_main(_control_interface)
-            websocket_server_main(_control_interface)
-        else:
-            aes_main(_control_interface, _control_interface.get_config()["password"])
-            websocket_client_main(_control_interface)
+        aes_main(_control_interface, _control_interface.get_config()["password"])
+        websocket_client_main(_control_interface)
 
 
 def on_server_startup(_):

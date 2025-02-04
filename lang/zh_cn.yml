@@ -46,4 +46,15 @@ connect_core:
     enter_key: "请输入初始化密钥: [!!connectcore key your_secret_key]"
     enter_key_first: "请先设置初始化密钥: [!!connectcore key your_secret_key]"
     finish: "已将配置文件保存至 config/connect_core/config.json"
+  commands:
+    client_help: "==help==\n
+    help: 获取帮助列表\n
+    info: 获取服务器状态\n
+    list: 获取子服务器列表\n"
+    server_help: "==help==\n
+    help: 获取帮助列表\n
+    list: 获取子服务器列表\n
+    getkey: 获取服务器密钥\n"
+
+
 

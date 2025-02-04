@@ -416,6 +416,15 @@ def get_server_id() -> str:
     return websocket_client.server_id
 
 
+def get_server_list() -> list:
+    """
+    获取子服务器列表
+    Returns:
+        list: 子服务器列表
+    """
+    return websocket_client.data_packet.server_list
+
+
 def get_history_data_packet() -> list:
     """获取历史数据包"""
     return websocket_client.get_history_data_packet()

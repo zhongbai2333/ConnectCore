@@ -475,7 +475,41 @@
         """
     ```
 
-11. **ControlInterface.add_command**
+11. **ControlInterface.get_server_list**
+
+    获取服务器列表
+
+    **Returns:**
+    >list: 服务器列表
+
+    ```python
+    def get_server_list(self) -> list:
+        """
+        获取服务器列表
+        
+        Returns:
+            list: 服务器列表
+        """
+    ```
+
+12. **ControlInterface.get_server_id**
+
+    获取客户端的服务器ID。
+
+    **Returns:**
+    >str: 服务器ID
+
+    ```python
+    def get_server_id(self) -> str:
+        """
+        客户端反馈服务器ID
+
+        Returns:
+            str: 服务器ID
+        """
+    ```
+
+13. **ControlInterface.add_command**
 
     添加命令到命令行界面中。
 
@@ -494,7 +528,7 @@
         """
     ```
 
-12. **ControlInterface.remove_command**
+14. **ControlInterface.remove_command**
 
     移除命令从命令行界面中。
 
@@ -511,7 +545,7 @@
         """
     ```
 
-13. **ControlInterface.set_prompt**
+15. **ControlInterface.set_prompt**
 
     设置命令行提示符。
 
@@ -528,7 +562,7 @@
         """
     ```
 
-14. **ControlInterface.set_completer_words**
+16. **ControlInterface.set_completer_words**
 
     设置命令行补全词典。
 
@@ -545,7 +579,7 @@
         """
     ```
 
-15. **ControlInterface.flush_cli**
+17. **ControlInterface.flush_cli**
 
     清空命令行界面。
 
@@ -556,7 +590,7 @@
         """
     ```
 
-16. `Class` **PluginControlInterface**
+18. `Class` **PluginControlInterface**
 
     插件控制接口，继承自 `CoreControlInterface`。
 
@@ -582,7 +616,7 @@
             super().__init__()
     ```
 
-17. **PluginControlInterface.send_data**
+19. **PluginControlInterface.send_data**
 
     向指定的服务器发送消息。
 
@@ -603,7 +637,7 @@
         """
     ```
 
-18. **PluginControlInterface.send_file**
+20. **PluginControlInterface.send_file**
 
     向指定的服务器发送文件。
 
@@ -628,24 +662,7 @@
         """
     ```
 
-19. **PluginControlInterface.get_server_id**
-
-    获取客户端的服务器ID。
-
-    **Returns:**
-    >str: 服务器ID
-
-    ```python
-    def get_server_id(self) -> str:
-        """
-        客户端反馈服务器ID
-
-        Returns:
-            str: 服务器ID
-        """
-    ```
-
-20. **PluginControlInterface.get_history_packet**
+21. **PluginControlInterface.get_history_packet**
 
     获取历史数据包。
 

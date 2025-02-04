@@ -3,7 +3,6 @@ from connect_core.websocket.server import websocket_server_main
 from connect_core.websocket.client import websocket_client_main
 from connect_core.aes_encrypt import aes_main
 from connect_core.plugin.init_plugin import init_plugin_main
-from connect_core.plugin.init_plugin import get_plugins
 from connect_core.interface.control_interface import CoreControlInterface
 from connect_core.account.register_system import register_system_main, get_password
 

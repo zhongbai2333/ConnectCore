@@ -612,6 +612,7 @@ class ClientDataPacket(DataPacket):
 
         self._is_server = False
         self._wait_file = None
+        self.server_list = []
         self._websocket_client = websocket_client
         self._send = self._websocket_client.send
 
@@ -687,9 +688,11 @@ class ClientDataPacket(DataPacket):
 
     async def _handle_new_login(self, data):
         new_connect(data["data"].get("payload")["server_list"])
+        self.server_list = data["data"].get("payload")["server_list"]
 
     async def _handle_del_login(self, data):
         del_connect(data["data"].get("payload")["server_list"])
+        self.server_list = data["data"].get("payload")["server_list"]
 
     async def _handle_login_error(self, data):
         _control_interface.error(f"Login Error: {data["data"]["payload"]["error"]}")
