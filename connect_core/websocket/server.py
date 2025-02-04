@@ -402,6 +402,11 @@ def send_file(
     )
 
 
+def get_server_list() -> list:
+    """获取服务器列表"""
+    return list(websocket_server.servers_info.keys())
+
+
 def get_history_data_packet(server_id) -> list:
     """获取历史数据包"""
     return websocket_server.get_history_data_packet(server_id)

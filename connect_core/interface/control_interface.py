@@ -14,15 +14,16 @@ class CoreControlInterface:
         if self.__mcdr_server:
             self.config_path = "./config/connect_core/config.json"
             self._is_server = self.get_config().get("is_server", False)
+            self.command_core = None
         else:
             from connect_core.cli.cli_entry import get_is_server
 
             self._is_server = get_is_server()
             self.config_path = "./config.json"
             self.language = self.get_config().get("language", "en_us")
+            self.command_core = CommandLineInterface(self)
+            self.command_core.start()
         self.log_system = LogSystem(self.sid, self.get_config().get("debug", False))
-        self.command_core = CommandLineInterface(self)
-        self.command_core.start()
 
     # =============
     #  Json Editer
@@ -206,6 +207,33 @@ class CoreControlInterface:
         """
         return self._is_server
 
+    def get_server_list(self) -> list:
+        """
+        获取服务器列表
+        
+        Returns:
+            list: 服务器列表
+        """
+        if self._is_server:
+            from connect_core.websocket.server import get_server_list
+            return get_server_list()
+        else:
+            from connect_core.websocket.client import get_server_list
+            return get_server_list()
+
+    def get_server_id(self) -> str:
+        """
+        客户端反馈服务器ID
+
+        Returns:
+            str: 服务器ID
+        """
+        from connect_core.websocket.client import get_server_id
+
+        if self.is_server():
+            return None
+        else:
+            return get_server_id()
 
 class PluginControlInterface(CoreControlInterface):
     def __init__(self, sid: str, self_path: str, config_path: str, mcdr: PluginServerInterface = None):
@@ -282,20 +310,6 @@ class PluginControlInterface(CoreControlInterface):
     # =========
     #   Tools
     # =========
-    def get_server_id(self) -> str:
-        """
-        客户端反馈服务器ID
-
-        Returns:
-            str: 服务器ID
-        """
-        from connect_core.websocket.client import get_server_id
-
-        if self.is_server():
-            return None
-        else:
-            return get_server_id()
-
     def get_history_packet(self, server_id: str = None) -> list | None:
         """
         获取历史数据包，客户端无需参数

@@ -26,10 +26,13 @@ class CommandActions(object):
         self.is_server = None
         self.password = None
         self.builder = SimpleCommandBuilder()
-        self.create_command()
+        if not self._control_interface.get_config():
+            self.create_init_command()
+        else:
+            self.create_normal_command()
 
-    def create_command(self):
-
+    def create_init_command(self):
+        self.builder.command("!!connectcore", self._handle_init)
         self.builder.command("!!connectcore init", self._handle_init)
         self.builder.command("!!connectcore mode <server|client>", self._handle_mode)
 
@@ -51,10 +54,53 @@ class CommandActions(object):
             "!!connectcore init", "初始化ConnectCore插件"
         )
 
+    def create_normal_command(self):
+        self._control_interface.debug("Creating normal command")
+        self.builder.command("!!connectcore", self._handle_help)
+        self.builder.command("!!connectcore help", self._handle_help)
+        self.builder.command("!!connectcore list", self._handle_list)
+
+        if self._control_interface.is_server():
+            self.builder.command("!!connectcore getkey", self._handle_getkey)
+        else:
+            self.builder.command("!!connectcore info", self._handle_info)
+
+        self.builder.register(self.__mcdr_server)
+
+        self.__mcdr_server.register_help_message(
+            "!!connectcore", "初始化ConnectCore插件"
+        )
+
     def _handle_init(self, source: CommandSource, context: CommandContext):
         self._control_interface.info(
             self._control_interface.tr("mcdr.enter_server_or_client")
         )
+
+    def _handle_help(self, source: CommandSource, context: CommandContext):
+        if self._control_interface.is_server():
+            self._control_interface.info(self._control_interface.tr("commands.server_help"))
+        else:
+            self._control_interface.info(self._control_interface.tr("commands.client_help"))
+
+    def _handle_list(self, source: CommandSource, context: CommandContext):
+        self._control_interface.info("==list==")
+        for num, key in enumerate(self._control_interface.get_server_list()):
+            self._control_interface.info(f"{num + 1}. {key}")
+
+    def _handle_getkey(self, source: CommandSource, context: CommandContext):
+        from connect_core.account.register_system import get_password
+
+        self._control_interface.info(
+            self._control_interface.tr("cli.starting.welcome_password", get_password())
+        )
+
+    def _handle_info(self, source: CommandSource, context: CommandContext):
+        self._control_interface.info("==info==")
+        server_id = self._control_interface.get_server_id()
+        if server_id:
+            self._control_interface.info(f"Main Server Connected! Server ID: {server_id}")
+        else:
+            self._control_interface.info("Main Server Disconnected!")
 
     def _handle_mode(self, source: CommandSource, context: CommandContext):
         if str(context["server|client"]).lower() == "server":
@@ -83,7 +129,9 @@ class CommandActions(object):
                 r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
                 self.ip,
             ):
-                self._control_interface.error(self._control_interface.tr("mcdr.invalid_ip"))
+                self._control_interface.error(
+                    self._control_interface.tr("mcdr.invalid_ip")
+                )
                 self.ip = None
                 return
             self._control_interface.info(self._control_interface.tr("mcdr.enter_port"))
@@ -100,7 +148,9 @@ class CommandActions(object):
                 return
             url = f"ws://{self.ip}:{self.port}"
             if not asyncio.run(self.check_websocket(url)):
-                print(f"Error: Can't Visit Server! {self.ip}, please check the IP address.")
+                print(
+                    f"Error: Can't Visit Server! {self.ip}, please check the IP address."
+                )
                 return
             config = {
                 "is_server": self.is_server,

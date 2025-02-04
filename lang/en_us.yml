@@ -46,3 +46,12 @@ connect_core:
     enter_key: "Please enter the initialization key: [!!connectcore key your_secret_key]"
     enter_key_first: "Please set the initialization key first: [!!connectcore key your_secret_key]"
     finish: "Configuration file has been saved to config/connect_core/config.json"
+  commands:
+    client_help: "==help==\n
+    help: Get help list\n
+    info: Get server status\n
+    list: Get list of sub-servers\n"
+    server_help: "==help==\n
+    help: Get help list\n
+    list: Get list of sub-servers\n
+    getkey: Get server key\n"
