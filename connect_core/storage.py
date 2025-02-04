@@ -1,4 +1,6 @@
-import json, os, zipfile
+import json
+import os
+import zipfile
 import yaml
 
 
@@ -9,7 +11,9 @@ class JsonDataEditor:
         if not os.path.exists(filepath):
             path, _ = os.path.split(filepath)
             if path != "." and path:
-                os.makedirs(path)
+                os.makedirs(
+                    path, exist_ok=True
+                )  # 使用 exist_ok=True 避免 FileExistsError
             self._write_data()
 
     def _read_data(self):

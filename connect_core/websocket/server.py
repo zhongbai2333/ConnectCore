@@ -370,7 +370,7 @@ def websocket_server_stop() -> WebsocketServer | None:
     try:
         websocket_server.close_server()
         return websocket_server
-    except NameError:
+    except Exception:
         return None
 
 

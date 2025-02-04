@@ -1,7 +1,9 @@
+import os
 from connect_core.log_system import LogSystem
 from connect_core.cli.command_core import CommandLineInterface
 
 from mcdreforged.api.types import PluginServerInterface
+
 
 class CoreControlInterface:
     def __init__(self):
@@ -40,7 +42,11 @@ class CoreControlInterface:
         """
         from connect_core.storage import JsonDataEditor
 
-        return JsonDataEditor(config_path if config_path else self.config_path).read()
+        if config_path:
+            config_path = os.path.join(f"./config/{self.sid}/", config_path)
+        else:
+            config_path = self.config_path
+        return JsonDataEditor(config_path).read()
 
     def save_config(self, config_data: dict, config_path: str = None) -> None:
         """
@@ -52,9 +58,11 @@ class CoreControlInterface:
         """
         from connect_core.storage import JsonDataEditor
 
-        JsonDataEditor(config_path if config_path else self.config_path).write(
-            config_data
-        )
+        if config_path:
+            config_path = os.path.join(f"./config/{self.sid}/", config_path)
+        else:
+            config_path = self.config_path
+        JsonDataEditor(config_path).write(config_data)
 
     # =============
     #   Translate
@@ -155,7 +163,7 @@ class CoreControlInterface:
     def add_command(self, command: str, func: callable):
         """
         添加命令到命令行界面中。
-        
+
         Args:
             command (str): 命令名称。
             func (callable): 命令对应的函数。
@@ -165,7 +173,7 @@ class CoreControlInterface:
     def remove_command(self, command: str):
         """
         移除命令从命令行界面中。
-        
+
         Args:
             command (str): 命令名称。
         """
@@ -174,7 +182,7 @@ class CoreControlInterface:
     def set_prompt(self, prompt: str):
         """
         设置命令行提示符。
-        
+
         Args:
             prompt (str): 命令行提示符内容。
         """
@@ -183,7 +191,7 @@ class CoreControlInterface:
     def set_completer_words(self, words: dict):
         """
         设置命令行补全词典。
-        
+
         Args:
             words (dict): 命令行补全词典内容。
         """
@@ -210,15 +218,17 @@ class CoreControlInterface:
     def get_server_list(self) -> list:
         """
         获取服务器列表
-        
+
         Returns:
             list: 服务器列表
         """
         if self._is_server:
             from connect_core.websocket.server import get_server_list
+
             return get_server_list()
         else:
             from connect_core.websocket.client import get_server_list
+
             return get_server_list()
 
     def get_server_id(self) -> str:
@@ -235,8 +245,15 @@ class CoreControlInterface:
         else:
             return get_server_id()
 
+
 class PluginControlInterface(CoreControlInterface):
-    def __init__(self, sid: str, self_path: str, config_path: str, mcdr: PluginServerInterface = None):
+    def __init__(
+        self,
+        sid: str,
+        self_path: str,
+        config_path: str,
+        mcdr: PluginServerInterface = None,
+    ):
         """
         插件控制接口
 
@@ -251,7 +268,9 @@ class PluginControlInterface(CoreControlInterface):
         self.sid = sid
         self.self_path = self_path
         self.config_path = config_path
-        self.log_system = LogSystem(self.sid, self.get_config().get("debug", False), mcdr=mcdr)
+        self.log_system = LogSystem(
+            self.sid, self.get_config().get("debug", False), mcdr=mcdr
+        )
 
     # ========
     #   Send
@@ -278,9 +297,7 @@ class PluginControlInterface(CoreControlInterface):
 
             client_send_data(self.sid, server_id, plugin_id, data)
 
-    def send_file(
-        self, server_id: str, plugin_id: str, file_path: str, save_path: str
-    ):
+    def send_file(self, server_id: str, plugin_id: str, file_path: str, save_path: str):
         """
         向指定的服务器发送文件。
 

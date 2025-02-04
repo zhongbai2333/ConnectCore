@@ -29,6 +29,7 @@ class CommandActions(object):
         if not self._control_interface.get_config():
             self.create_init_command()
         else:
+            self.permission = self._control_interface.get_config().get("permission", {})
             self.create_normal_command()
 
     def create_init_command(self):
@@ -77,30 +78,58 @@ class CommandActions(object):
         )
 
     def _handle_help(self, source: CommandSource, context: CommandContext):
+        if not source.has_permission_higher_than(self.permission["help"]):
+            source.reply(
+                self._control_interface.tr(
+                    "commands.need_permission", self.permission["help"]
+                )
+            )
+            return
         if self._control_interface.is_server():
-            self._control_interface.info(self._control_interface.tr("commands.server_help"))
+            source.reply(self._control_interface.tr("commands.server_help"))
         else:
-            self._control_interface.info(self._control_interface.tr("commands.client_help"))
+            source.reply(self._control_interface.tr("commands.client_help"))
 
     def _handle_list(self, source: CommandSource, context: CommandContext):
-        self._control_interface.info("==list==")
+        if not source.has_permission_higher_than(self.permission["list"]):
+            source.reply(
+                self._control_interface.tr(
+                    "commands.need_permission", self.permission["list"]
+                )
+            )
+            return
+        source.reply("==list==")
         for num, key in enumerate(self._control_interface.get_server_list()):
-            self._control_interface.info(f"{num + 1}. {key}")
+            source.reply(f"{num + 1}. {key}")
 
     def _handle_getkey(self, source: CommandSource, context: CommandContext):
+        if not source.has_permission_higher_than(self.permission["getkey"]):
+            source.reply(
+                self._control_interface.tr(
+                    "commands.need_permission", self.permission["getkey"]
+                )
+            )
+            return
         from connect_core.account.register_system import get_password
 
-        self._control_interface.info(
+        source.reply(
             self._control_interface.tr("cli.starting.welcome_password", get_password())
         )
 
     def _handle_info(self, source: CommandSource, context: CommandContext):
-        self._control_interface.info("==info==")
+        if not source.has_permission_higher_than(self.permission["info"]):
+            source.reply(
+                self._control_interface.tr(
+                    "commands.need_permission", self.permission["info"]
+                )
+            )
+            return
+        source.reply("==info==")
         server_id = self._control_interface.get_server_id()
         if server_id:
-            self._control_interface.info(f"Main Server Connected! Server ID: {server_id}")
+            source.reply(f"Main Server Connected! Server ID: {server_id}")
         else:
-            self._control_interface.info("Main Server Disconnected!")
+            source.reply("Main Server Disconnected!")
 
     def _handle_mode(self, source: CommandSource, context: CommandContext):
         if str(context["server|client"]).lower() == "server":
@@ -159,6 +188,11 @@ class CommandActions(object):
                 "ip": self.ip,
                 "port": self.port,
                 "debug": False,
+                "permission": {
+                    "help": 0,
+                    "list": 2,
+                    "info": 2,
+                },
             }
             self._control_interface.save_config(config)
             self._control_interface.info(self._control_interface.tr("mcdr.finish"))
@@ -191,6 +225,11 @@ class CommandActions(object):
             "ip": self.ip,
             "port": self.port,
             "debug": False,
+            "permission": {
+                "help": 0,
+                "list": 2,
+                "getkey": 4,
+            },
         }
         self._control_interface.save_config(config)
         self._control_interface.info(self._control_interface.tr("mcdr.finish"))
@@ -227,6 +266,11 @@ class CommandActions(object):
             "ip": last_ip,
             "port": data["port"],
             "debug": False,
+            "permission": {
+                "help": 0,
+                "list": 2,
+                "info": 2,
+            },
         }
         self._control_interface.save_config(config)
         self._control_interface.info(self._control_interface.tr("mcdr.finish"))

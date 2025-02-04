@@ -2,59 +2,51 @@ connect_core:
   cli:
     initialization_config:
       enter_ip: "请输入服务器IP/域名(公网): [127.0.0.1] "
-      invalid_ip: "无效的IP地址，请重新输入。"
+      invalid_ip: "无效的§cIP地址§r，请重新输入。"
       enter_port: "请输入服务器端口: [23233] "
-      invalid_port: "无效的端口，请重新输入。"
-      enter_key: "请输入初始化密钥: "
-      finish: "已将配置文件保存至 config.json"
+      invalid_port: "无效的§c端口§r，请重新输入。"
+      enter_key: "请输入§a初始化密钥§r: "
+      finish: "已将配置文件保存至 §aconfig.json§r"
     starting:
-      welcome: "请使用 \"getkey\" 获取子服务器初始化密钥"
-      welcome_password: "群组密钥为: {}"
+      welcome: "请使用 \"§agetkey§r\" 获取子服务器初始化密钥"
+      welcome_password: "群组密钥为: §a{}§r"
   net_core:
     service:
-      start_websocket: "Websocket 启动成功！"
-      connect_websocket: "Websocket 连接成功！{}"
-      stop_websocket: "Websocket 已关闭！"
+      start_websocket: "§aWebsocket§r 启动成功！"
+      connect_websocket: "§aWebsocket§r 连接成功！{}"
+      stop_websocket: "§cWebsocket§r 已关闭！"
       disconnect_websocket: "已与主服务器断开连接，正在尝试重连！"
-      stop_receive: "Receive 服务已退出！"
-      disconnect_from_sub_websocket: "子服务器 {} 已与 Main Websockets 断开连接！"
-      disconnect_from_unknown_websocket: "Main Websockets 已断开一个陌生的连接！"
-      error_password: "密钥错误！请修改密钥后重载插件！"
-      already_login: "已经有一个子服务器连接！"
-      sub_server_download_finish: "子服务器 {} 已完成文件下载！"
-      file_download_finish_from_other: "来自服务器 {} 的文件已下载完成！文件已保存至 {}"
+      stop_receive: "§cReceive 服务§r已退出！"
+      disconnect_from_sub_websocket: "子服务器 §e{}§r 已与 Main Websockets 断开连接！"
+      disconnect_from_unknown_websocket: "Main Websockets 已断开一个§e陌生的连接§r！"
+      error_password: "§c密钥错误§r！请修改密钥后重载插件！"
+      already_login: "已经有一个子服务器§c连接§r！"
+      sub_server_download_finish: "子服务器 §a{}§r 已完成文件下载！"
+      file_download_finish_from_other: "来自服务器 §a{}§r 的文件已下载完成！文件已保存至 §a{}§r"
   rsa:
-    decrypt_error: "解密失败，密钥错误或数据被篡改！"
+    decrypt_error: "§c解密失败§r，密钥错误或数据被篡改！"
   plugin:
-    load_finish: "插件 {} v{} 加载成功！"
-    cant_load: "无法加载插件 {} , 可能没有与ConnectCore兼容！"
-    cant_initialize : "插件 {} 没有初始化函数"
-    unload_finish: "插件 {} 已卸载！"
+    load_finish: "插件 §a{} v{}§r 加载成功！"
+    cant_load: "无法加载插件 §c{}§r , 可能没有与ConnectCore兼容！"
+    cant_initialize : "插件 §c{}§r 没有初始化函数"
+    unload_finish: "插件 §a{}§r 已卸载！"
   mcdr:
-    plugin_loaded: "插件 {} 加载成功！"
-    config_need_be_initialized: "配置文件需要先初始化才能使用！请使用命令 !!connectcore init"
-    config_already_initialized: "配置文件已经初始化过了！"
+    plugin_loaded: "插件 §a{}§r 加载成功！"
+    config_need_be_initialized: "配置文件需要先§c初始化§r才能使用！请使用命令 !!connectcore init"
+    config_already_initialized: "配置文件已经§e初始化过了§r！"
     config_loaded: "配置文件加载成功！"
-    command_not_found: "未找到参数 {} !"
-    enter_server_or_client: "请输入服务器或客户端模式: [!!connectcore mode server/client]"
-    enter_server_or_client_first: "请先选择服务器模式: [!!connectcore mode server/client]"
-    enter_ip: "请输入服务器IP/域名(公网): [!!connectcore ip 127.0.0.1] "
-    invalid_ip: "无效的IP地址！"
-    enter_ip_first: "请先设置服务器IP/域名: [!!connectcore ip 127.0.0.1] "
-    enter_port: "请输入服务器端口: [!!connectcore port 23233] "
-    invalid_port: "无效的端口！"
-    enter_key: "请输入初始化密钥: [!!connectcore key your_secret_key]"
-    enter_key_first: "请先设置初始化密钥: [!!connectcore key your_secret_key]"
-    finish: "已将配置文件保存至 config/connect_core/config.json"
+    command_not_found: "未找到§c参数§r {} !"
+    enter_server_or_client: "请输入服务器或客户端模式: [!!connectcore mode §aserver/client§r]"
+    enter_server_or_client_first: "请先选择§c服务器模式§r: [!!connectcore mode server/client]"
+    enter_ip: "请输入服务器IP/域名(公网): [!!connectcore ip §a127.0.0.1§r] "
+    invalid_ip: "无效的§cIP地址§r！"
+    enter_ip_first: "请先设置服务器§cIP/域名§r: [!!connectcore ip 127.0.0.1] "
+    enter_port: "请输入服务器端口: [!!connectcore port §a23233§r] "
+    invalid_port: "无效的§c端口§r！"
+    enter_key: "请输入§a初始化密钥§r: [!!connectcore key your_secret_key]"
+    enter_key_first: "请先设置§c初始化密钥§r: [!!connectcore key your_secret_key]"
+    finish: "已将配置文件保存至 §aconfig/connect_core/config.json§r"
   commands:
-    client_help: "==help==\n
-    help: 获取帮助列表\n
-    info: 获取服务器状态\n
-    list: 获取子服务器列表\n"
-    server_help: "==help==\n
-    help: 获取帮助列表\n
-    list: 获取子服务器列表\n
-    getkey: 获取服务器密钥\n"
-
-
-
+    client_help: "§a==help==§r\nhelp: 获取帮助列表\ninfo: 获取服务器状态\nlist: 获取子服务器列表\n"
+    server_help: "§a==help==§r\nhelp: 获取帮助列表\nlist: 获取子服务器列表\ngetkey: 获取服务器密钥\n"
+    need_permission: "§4权限不足§r！你至少需要 §4{}级§r及以上！"
