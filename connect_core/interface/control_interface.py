@@ -16,15 +16,13 @@ class CoreControlInterface:
         if self.__mcdr_server:
             self.config_path = "./config/connect_core/config.json"
             self._is_server = self.get_config().get("is_server", False)
-            self.command_core = None
         else:
             from connect_core.cli.cli_entry import get_is_server
 
             self._is_server = get_is_server()
             self.config_path = "./config.json"
             self.language = self.get_config().get("language", "en_us")
-            self.command_core = CommandLineInterface(self)
-            self.command_core.start()
+
         self.log_system = LogSystem(self.sid, self.get_config().get("debug", False))
 
     # =============
@@ -168,7 +166,9 @@ class CoreControlInterface:
             command (str): 命令名称。
             func (callable): 命令对应的函数。
         """
-        self.command_core.add_command(self.sid, command, func)
+        from connect_core.cli.cli_core import command_core
+
+        command_core.add_command(self.sid, command, func)
 
     def remove_command(self, command: str):
         """
@@ -177,7 +177,9 @@ class CoreControlInterface:
         Args:
             command (str): 命令名称。
         """
-        self.command_core.remove_command(self.sid, command)
+        from connect_core.cli.cli_core import command_core
+
+        command_core.remove_command(self.sid, command)
 
     def set_prompt(self, prompt: str):
         """
@@ -186,7 +188,9 @@ class CoreControlInterface:
         Args:
             prompt (str): 命令行提示符内容。
         """
-        self.command_core.set_prompt(prompt)
+        from connect_core.cli.cli_core import command_core
+
+        command_core.set_prompt(prompt)
 
     def set_completer_words(self, words: dict):
         """
@@ -195,13 +199,17 @@ class CoreControlInterface:
         Args:
             words (dict): 命令行补全词典内容。
         """
-        self.command_core.set_completer_words(self.sid, words)
+        from connect_core.cli.cli_core import command_core
+
+        command_core.set_completer_words(self.sid, words)
 
     def flush_cli(self):
         """
         清空命令行界面。
         """
-        self.command_core.flush_cli()
+        from connect_core.cli.cli_core import command_core
+
+        command_core.flush_cli()
 
     # =========
     #   Tools

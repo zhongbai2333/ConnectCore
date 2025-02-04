@@ -118,10 +118,9 @@ class PluginLoader:
 
     def reload(self, plugin_id: str):
         """重载插件，先卸载再加载"""
-        if plugin_id in self.plugins:
-            self.unload(plugin_id)
-        if "path" in self.plugins[plugin_id].keys():
+        if plugin_id in self.plugins and "path" in self.plugins[plugin_id].keys():
             plugin_file = self.plugins[plugin_id]["path"].split("/")[-1]
+            self.unload(plugin_id)
             self.load_plugin(plugin_file)
         else:
             from connect_core.mcdr.mcdr_entry import get_mcdr

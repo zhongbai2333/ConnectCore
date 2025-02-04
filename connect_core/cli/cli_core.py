@@ -6,11 +6,16 @@ from connect_core.plugin.init_plugin import init_plugin_main
 from connect_core.interface.control_interface import CoreControlInterface
 from connect_core.account.register_system import register_system_main
 from connect_core.cli.commands import ServerCommand, ClientCommand
+from connect_core.cli.command_core import CommandLineInterface
 
+command_core = None
 
 class Server(object):
     def __init__(self) -> None:
+        global command_core
         self._control_interface = CoreControlInterface()
+        command_core = CommandLineInterface(self._control_interface)
+        command_core.start()
         self._control_interface.info(self._control_interface.tr("cli.starting.welcome"))
         register_system_main(self._control_interface)
         init_plugin_main(self._control_interface)
@@ -45,7 +50,10 @@ class Server(object):
 
 class Client(object):
     def __init__(self) -> None:
+        global command_core
         self._control_interface = CoreControlInterface()
+        command_core = CommandLineInterface(self._control_interface)
+        command_core.start()
         _config = self._control_interface.get_config()
         self._control_interface.info(
             self._control_interface.tr(
