@@ -19,6 +19,11 @@
  2. 启动MCDR服务器，然后使用`!!connectcore init`命令来启用初始化程序。
  3. 根据提示进行配置。
 
+## 开发
+
+- 详细的中文开发文档可以在[DOCS](https://github.com/zhongbai2333/ConnectCore/tree/master/doc)中找到。
+- 样例插件请前往[ExamplePlugin](https://github.com/zhongbai2333/ExamplePlugin)
+
 ## 注意事项
 
 - 确保你的服务器和客户端能够正确连接到网络。

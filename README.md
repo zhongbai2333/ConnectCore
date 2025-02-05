@@ -19,6 +19,11 @@ English | [简中](README_zh.md)
 2. Start the MCDR server, then use the `!!connectcore init` command to enable the initialization process.
 3. Follow the prompts to configure.
 
+## Development
+
+- A detailed English development documentation can be found on the [WIKI](https://github.com/zhongbai2333/ConnectCore/wiki/%5BDevelop%5D-API).
+- For sample plugins, please visit [ExamplePlugin](https://github.com/zhongbai2333/ExamplePlugin).
+
 ## Notes
 
 - Ensure that your server and client can properly connect to the network.
