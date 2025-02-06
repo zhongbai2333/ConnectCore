@@ -29,7 +29,7 @@ class CommandActions(object):
         if not self._control_interface.get_config():
             self.create_init_command()
         else:
-            self.permission = self._control_interface.get_config().get("permission", {})
+            self.permission = self._control_interface.get_config("permission", {})
             self.create_normal_command()
 
     def create_init_command(self):

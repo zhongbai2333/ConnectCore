@@ -98,7 +98,7 @@ class WebsocketServer(object):
             server_id (str): 消息对应的服务器 ID。
         """
         try:
-            accounts = _control_interface.get_config("account.json").copy()
+            accounts = _control_interface.get_config(config_path="account.json").copy()
             msg_data = self._decrypt_message(msg, server_id, accounts)
             await self._parse_msg(msg_data, websocket)
         except ValueError as ve:
@@ -180,7 +180,7 @@ class WebsocketServer(object):
             f"[S][{data['type']}][{data['from']} -> {data['to']}({account})][{data['sid']}] {data['data']}"
         )
 
-        accounts = _control_interface.get_config("account.json")
+        accounts = _control_interface.get_config(config_path="account.json")
         if account == "-----":
             await websocket.send(
                 aes_encrypt(json.dumps(data).encode(), get_register_password())

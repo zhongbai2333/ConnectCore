@@ -394,7 +394,7 @@ class ServerDataPacket(DataPacket):
 
     async def _handle_register_error(self, data, websocket):
         server_id, password = self._generate_server_credentials()
-        accounts = _control_interface.get_config("account.json")
+        accounts = _control_interface.get_config(config_path="account.json")
         del accounts[list(accounts.keys())[-1]]  # Remove the last account
         accounts[server_id] = password
         _control_interface.save_config(accounts, "account.json")
@@ -482,7 +482,7 @@ class ServerDataPacket(DataPacket):
         return server_id, password
 
     def _save_credentials(self, server_id, password):
-        accounts = _control_interface.get_config("account.json")
+        accounts = _control_interface.get_config(config_path="account.json")
         accounts[server_id] = password
         _control_interface.save_config(accounts, "account.json")
 

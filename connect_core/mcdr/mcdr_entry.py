@@ -69,7 +69,7 @@ def on_load(server: PluginServerInterface, _):
             register_system_main(_control_interface)
             websocket_server_main(_control_interface)
         else:
-            aes_main(_control_interface, _control_interface.get_config()["password"])
+            aes_main(_control_interface, _control_interface.get_config("password"))
             websocket_client_main(_control_interface)
 
 
@@ -83,7 +83,7 @@ def on_server_startup(_):
 
 def on_unload(_):
     # 插件卸载时执行的代码
-    if _control_interface.get_config().get("is_server", False):
+    if _control_interface.get_config("is_server", False):
         websocket_server = websocket_server_stop()
         _control_interface.info("Waiting for the WebSocket server to close...")
         while not websocket_server.finish_close:
