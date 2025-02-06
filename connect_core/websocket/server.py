@@ -6,7 +6,7 @@ import os
 from connect_core.websocket.data_packet import ServerDataPacket
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.account.register_system import get_register_password
-from connect_core.plugin.init_plugin import del_connect, disconnected
+from connect_core.plugin.init_plugin import del_connect
 from connect_core.tools import new_thread, auto_trigger
 from typing import TYPE_CHECKING
 
@@ -147,7 +147,6 @@ class WebsocketServer(object):
 
             self.data_packet.del_server_id(server_id)
 
-            disconnected()
             del_connect(list(self.servers_info.keys()))
 
             await self.broadcast(
