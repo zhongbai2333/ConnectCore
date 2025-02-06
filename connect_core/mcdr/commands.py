@@ -228,7 +228,7 @@ class CommandActions(object):
             "permission": {
                 "help": 0,
                 "list": 2,
-                "getkey": 4,
+                "getkey": 3,
             },
         }
         self._control_interface.save_config(config)

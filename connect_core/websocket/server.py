@@ -100,7 +100,7 @@ class WebsocketServer(object):
         try:
             accounts = _control_interface.get_config(config_path="account.json").copy()
             msg_data = self._decrypt_message(msg, server_id, accounts)
-            await self._parse_msg(msg_data, websocket)
+            self._parse_msg(msg_data, websocket)
         except ValueError as ve:
             _control_interface.warn(
                 f"Failed to process message from server {server_id}: {ve}"
@@ -181,16 +181,21 @@ class WebsocketServer(object):
         )
 
         accounts = _control_interface.get_config(config_path="account.json")
-        if account == "-----":
-            await websocket.send(
-                aes_encrypt(json.dumps(data).encode(), get_register_password())
-            )
-        elif account in accounts:
-            await websocket.send(
-                aes_encrypt(json.dumps(data).encode(), accounts[account])
-            )
-        else:
-            raise ValueError(f"Unknown Account: {account}")
+        try:
+            if account == "-----":
+                await websocket.send(
+                    aes_encrypt(json.dumps(data).encode(), get_register_password())
+                )
+            elif account in accounts:
+                await websocket.send(
+                    aes_encrypt(json.dumps(data).encode(), accounts[account])
+                )
+            else:
+                raise ValueError(f"Unknown Account: {account}")
+        except (websockets.exceptions.ConnectionClosedError) or (
+            websockets.exceptions.ConnectionClosedOK
+        ):
+            pass
 
     async def broadcast(self, data: dict, except_id: list = []) -> None:
         """广播消息到所有已连接的子服务器。"""
@@ -338,9 +343,10 @@ class WebsocketServer(object):
                 await self.send(self.last_send_packet[i], self.websockets[i], i)
 
     # ============ Prase Data ============
-    async def _parse_msg(self, data: dict, websocket) -> None:
+    @new_thread("Parse_Msg")
+    def _parse_msg(self, data: dict, websocket) -> None:
         """解析并处理从子服务器接收到的消息。"""
-        await self.data_packet.parse_msg(data, websocket)
+        asyncio.run(self.data_packet.parse_msg(data, websocket))
 
     # ========== Tools ==========
     @auto_trigger(interval=30, thread_name="resend")
@@ -377,11 +383,18 @@ def send_data(
     f_server_id: str, f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict
 ) -> None:
     """发送消息到指定的子服务器。"""
-    asyncio.run(
-        websocket_server.send_data_to_other_server(
-            f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+    try:
+        asyncio.run(
+            websocket_server.send_data_to_other_server(
+                f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+            )
         )
-    )
+    except RuntimeError:
+        asyncio.ensure_future(
+            websocket_server.send_data_to_other_server(
+                f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+            )
+        )
 
 
 @new_thread("SendFile")
@@ -394,11 +407,18 @@ def send_file(
     save_path: str,
 ) -> None:
     """发送文件到指定的子服务器。"""
-    asyncio.run(
-        websocket_server.send_file_to_other_server(
-            f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+    try:
+        asyncio.run(
+            websocket_server.send_file_to_other_server(
+                f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+            )
         )
-    )
+    except RuntimeError:
+        asyncio.ensure_future(
+            websocket_server.send_file_to_other_server(
+                f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+            )
+        )
 
 
 def get_server_list() -> list:

@@ -86,12 +86,14 @@ def on_unload(_):
     if _control_interface.get_config("is_server", False):
         websocket_server = websocket_server_stop()
         _control_interface.info("Waiting for the WebSocket server to close...")
-        while not websocket_server.finish_close:
-            time.sleep(0.5)
-        _control_interface.info("WebSocket server closed.")
+        if websocket_client:
+            while not websocket_server.finish_close:
+                time.sleep(0.5)
+            _control_interface.info("WebSocket server closed.")
     else:
         websocket_client = websocket_client_stop()
         _control_interface.info("Waiting for the WebSocket client to close...")
-        while not websocket_client.finish_close:
-            time.sleep(0.5)
-        _control_interface.info("WebSocket client closed.")
+        if websocket_server:
+            while not websocket_client.finish_close:
+                time.sleep(0.5)
+            _control_interface.info("WebSocket client closed.")

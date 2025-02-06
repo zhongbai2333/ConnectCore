@@ -105,7 +105,7 @@ class LogSystem:
         """
         if self.mcdr_core:
             if level == "DEBUG":
-                self.mcdr_core.logger.info("[DEBUG] " + "".join(msg))
+                self.mcdr_core.logger.info("[§1DEBUG§r] " + "".join(msg))
             else:
                 getattr(self.mcdr_core.logger, level.lower())("".join(msg))
         else:

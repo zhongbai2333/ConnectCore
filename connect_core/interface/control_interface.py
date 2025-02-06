@@ -1,4 +1,5 @@
 import os
+import asyncio
 from connect_core.log_system import LogSystem
 from connect_core.cli.command_core import CommandLineInterface
 
@@ -35,9 +36,9 @@ class CoreControlInterface:
         获取配置文件，如果配置文件不存在或为空则不会写入到配置文件中，请使用`save_config`初始化
 
         Args:
-            config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
             key (str): 配置项名称, 默认为 "all", 表示读取所有配置项
             default (any): 默认值, 如果配置项不存在则返回默认值且写入到配置文件中
+            config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
 
         Returns:
             dict: 配置文件字典
@@ -292,7 +293,7 @@ class PluginControlInterface(CoreControlInterface):
         self.self_path = self_path
         self.config_path = config_path
         self.log_system = LogSystem(
-            self.sid, self.get_config().get("debug", False), mcdr=mcdr
+            self.sid, self.get_config("debug", False), mcdr=mcdr
         )
 
     # ========
