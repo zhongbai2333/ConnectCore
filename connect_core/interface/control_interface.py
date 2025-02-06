@@ -249,7 +249,7 @@ class CoreControlInterface:
         from connect_core.websocket.client import get_server_id
 
         if self.is_server():
-            return None
+            return "-----"
         else:
             return get_server_id()
 
