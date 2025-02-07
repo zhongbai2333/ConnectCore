@@ -618,6 +618,11 @@
             """
             # 导入
             super().__init__()
+
+            self.sid = sid
+            self.self_path = self_path
+            self.config_path = config_path
+            self.mcdr = mcdr
     ```
 
 19. **PluginControlInterface.send_data**

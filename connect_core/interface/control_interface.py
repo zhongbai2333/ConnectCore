@@ -292,6 +292,7 @@ class PluginControlInterface(CoreControlInterface):
         self.sid = sid
         self.self_path = self_path
         self.config_path = config_path
+        self.mcdr = mcdr
         self.log_system = LogSystem(
             self.sid, self.get_config("debug", False), mcdr=mcdr
         )
