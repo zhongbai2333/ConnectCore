@@ -81,7 +81,7 @@ class Client(object):
         """
 
         aes_main(
-            self._control_interface, self._control_interface.get_config()["password"]
+            self._control_interface, self._control_interface.get_config("password")
         )
         # 启动WebSocket客户端
         websocket_client_main(self._control_interface)

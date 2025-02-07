@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from connect_core.websocket.client import WebsocketClient
 
 from connect_core.plugin.init_plugin import (
+    connected,
     new_connect,
     del_connect,
     recv_data,
@@ -394,7 +395,7 @@ class ServerDataPacket(DataPacket):
 
     async def _handle_register_error(self, data, websocket):
         server_id, password = self._generate_server_credentials()
-        accounts = _control_interface.get_config("account.json")
+        accounts = _control_interface.get_config(config_path="account.json")
         del accounts[list(accounts.keys())[-1]]  # Remove the last account
         accounts[server_id] = password
         _control_interface.save_config(accounts, "account.json")
@@ -482,7 +483,7 @@ class ServerDataPacket(DataPacket):
         return server_id, password
 
     def _save_credentials(self, server_id, password):
-        accounts = _control_interface.get_config("account.json")
+        accounts = _control_interface.get_config(config_path="account.json")
         accounts[server_id] = password
         _control_interface.save_config(accounts, "account.json")
 
@@ -682,9 +683,9 @@ class ClientDataPacket(DataPacket):
         self._websocket_client.stop_server()
 
     async def _handle_logined(self, data):
-        os.system(f"title ConnectCore Client {data["to"][0]}")
         self._websocket_client.server_id = data["to"][0]
         self._websocket_client._start_trigger_websocket_client()
+        connected()
 
     async def _handle_new_login(self, data):
         new_connect(data["data"].get("payload")["server_list"])
@@ -702,7 +703,7 @@ class ClientDataPacket(DataPacket):
         if not data["data"].get("payload", None) or self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
-            recv_data(data["to"][1], data["to"][0], data["data"].get("payload", None))
+            recv_data(data["to"][1], data["from"][0], data["data"].get("payload", None))
             await self._send_data_response()
         else:
             await self._send_data_error()

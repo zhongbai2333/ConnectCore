@@ -1,6 +1,6 @@
 # ConnetCore
 
- 这是一个MCDReforged的前置插件，也可以独立使用，用于将你的服务器建立成群组。拥有较高的安全性和简易的配置，适合各种服务器环境。
+ 这是一个MCDReforged的前置插件，也可以独立使用，用于将你的服务器建立成插件控制群组，主要用于子服务器间插件的通信，比如为跨服聊天提供API和通信支持。拥有较高的安全性和简易的配置，适合各种服务器环境。
 
  [English](README.md) | 简中
 
@@ -18,6 +18,11 @@
  1. 将`ConnectCore.pyz`文件放在MCDR的插件目录内（通常是`plugins`文件夹）。
  2. 启动MCDR服务器，然后使用`!!connectcore init`命令来启用初始化程序。
  3. 根据提示进行配置。
+
+## 开发
+
+- 详细的中文开发文档可以在[DOCS](https://github.com/zhongbai2333/ConnectCore/tree/master/doc)中找到。
+- 样例插件请前往[ExamplePlugin](https://github.com/zhongbai2333/ExamplePlugin)
 
 ## 注意事项
 

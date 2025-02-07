@@ -60,11 +60,11 @@ def get_password() -> str:
     time.sleep(1.2)
     data = {
         "ip": {
-            "config": _control_interface.get_config()["ip"],
+            "config": _control_interface.get_config("ip"),
             "inside": get_all_internal_ips(),
             "outside": get_external_ip(),
         },
-        "port": _control_interface.get_config()["port"],
+        "port": _control_interface.get_config("port"),
         "password": _password,
     }
     data = encode_base64(json.dumps(data))

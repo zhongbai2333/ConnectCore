@@ -7,7 +7,7 @@ import websockets
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.tools import new_thread, auto_trigger
 from connect_core.websocket.data_packet import ClientDataPacket
-from connect_core.plugin.init_plugin import connected, disconnected
+from connect_core.plugin.init_plugin import disconnected
 
 from typing import TYPE_CHECKING
 
@@ -90,7 +90,6 @@ class WebsocketClient(object):
                     _control_interface.info(
                         _control_interface.tr("net_core.service.connect_websocket", "")
                     )
-                    connected()
                     await self._receive()
                 break
             except ConnectionRefusedError:
@@ -125,7 +124,6 @@ class WebsocketClient(object):
                         _control_interface.tr("net_core.service.disconnect_websocket")
                         + str(e)
                     )
-                    os.system(f"title ConnectCore Client")
                     self._start_trigger_websocket_client.stop()
                     disconnected()
                     websocket_client_main(_control_interface)
@@ -168,7 +166,7 @@ class WebsocketClient(object):
                     if str(recv_data.decode())[0] != "{":
                         recv_data = aes_decrypt(recv_data).decode()
                     recv_data = json.loads(recv_data)
-                    await self._parse_msg(recv_data)
+                    self._parse_msg(recv_data)
                 else:
                     break
             except asyncio.CancelledError:
@@ -195,22 +193,28 @@ class WebsocketClient(object):
         _control_interface.debug(
             f"[S][{data['type']}][{data['from']} -> {data['to']}][{data['sid']}] {data['data']}"
         )
-        if account:
-            await self.websocket.send(
-                json.dumps(
-                    {
-                        "account": account,
-                        "data": aes_encrypt(json.dumps(data).encode()).decode(),
-                    }
-                ).encode()
-            )
-        else:
-            await self.websocket.send(
-                json.dumps({"account": account, "data": data}).encode()
-            )
+        try:
+            if account:
+                await self.websocket.send(
+                    json.dumps(
+                        {
+                            "account": account,
+                            "data": aes_encrypt(json.dumps(data).encode()).decode(),
+                        }
+                    ).encode()
+                )
+            else:
+                await self.websocket.send(
+                    json.dumps({"account": account, "data": data}).encode()
+                )
+        except (websockets.exceptions.ConnectionClosedError) or (
+            websockets.exceptions.ConnectionClosedOK
+        ):
+            pass
 
     async def _trigger_websocket_client(self) -> None:
         # 如果有上一个数据包，则发送上一个数据包
+        await asyncio.sleep(5)
         if self.last_data_packet:
             await self.send(self.last_data_packet)
         await self.send(
@@ -316,7 +320,8 @@ class WebsocketClient(object):
     # =============
     #   Parse Msg
     # =============
-    async def _parse_msg(self, data: dict) -> None:
+    @new_thread("Prase_Msg")
+    def _parse_msg(self, data: dict) -> None:
         """
         解析并处理从服务器接收到的消息。
         如果消息中包含服务器 ID，则更新客户端的服务器 ID。
@@ -324,7 +329,7 @@ class WebsocketClient(object):
         Args:
             data (dict): 从服务器接收到的消息内容。
         """
-        await self.data_packet.parse_msg(data)
+        asyncio.run(self.data_packet.parse_msg(data))
 
     # =========
     #   Tools
@@ -374,11 +379,18 @@ def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) 
         t_plugin_id (str): 子服务器插件的唯一标识符
         data (dict): 要发送的消息内容。
     """
-    asyncio.run(
-        websocket_client.send_data_to_other_server(
-            f_plugin_id, t_server_id, t_plugin_id, data
+    try:
+        asyncio.run(
+            websocket_client.send_data_to_other_server(
+                f_plugin_id, t_server_id, t_plugin_id, data
+            )
         )
-    )
+    except RuntimeError:
+        asyncio.ensure_future(
+            websocket_client.send_data_to_other_server(
+                f_plugin_id, t_server_id, t_plugin_id, data
+            )
+        )
 
 
 @new_thread("SendFile")
@@ -399,11 +411,18 @@ def send_file(
         file_path (str): 要发送的文件目录。
         save_path (str): 要保存的位置。
     """
-    asyncio.run(
-        websocket_client.send_file_to_other_server(
-            f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+    try:
+        asyncio.run(
+            websocket_client.send_file_to_other_server(
+                f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+            )
         )
-    )
+    except RuntimeError:
+        asyncio.ensure_future(
+            websocket_client.send_file_to_other_server(
+                f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+            )
+        )
 
 
 def get_server_id() -> str:

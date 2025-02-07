@@ -1,4 +1,5 @@
 import os
+import asyncio
 from connect_core.log_system import LogSystem
 from connect_core.cli.command_core import CommandLineInterface
 
@@ -15,24 +16,28 @@ class CoreControlInterface:
         self.__mcdr_server = get_mcdr()
         if self.__mcdr_server:
             self.config_path = "./config/connect_core/config.json"
-            self._is_server = self.get_config().get("is_server", False)
+            self._is_server = self.get_config("is_server", False)
         else:
             from connect_core.cli.cli_entry import get_is_server
 
             self._is_server = get_is_server()
             self.config_path = "./config.json"
-            self.language = self.get_config().get("language", "en_us")
+            self.language = self.get_config("language", "en_us")
 
-        self.log_system = LogSystem(self.sid, self.get_config().get("debug", False))
+        self.log_system = LogSystem(self.sid, self.get_config("debug", False))
 
     # =============
     #  Json Editer
     # =============
-    def get_config(self, config_path: str = None) -> dict:
+    def get_config(
+        self, key: str = "all", default: any = None, config_path: str = None, 
+    ) -> dict:
         """
-        获取配置文件
+        获取配置文件，如果配置文件不存在或为空则不会写入到配置文件中，请使用`save_config`初始化
 
         Args:
+            key (str): 配置项名称, 默认为 "all", 表示读取所有配置项
+            default (any): 默认值, 如果配置项不存在则返回默认值且写入到配置文件中
             config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
 
         Returns:
@@ -44,7 +49,18 @@ class CoreControlInterface:
             config_path = os.path.join(f"./config/{self.sid}/", config_path)
         else:
             config_path = self.config_path
-        return JsonDataEditor(config_path).read()
+        config = JsonDataEditor(config_path).read()
+        if not config:
+            return default
+        elif key == "all":
+            return config
+        else:
+            if key in config.keys():
+                return config[key]
+            else:
+                config[key] = default
+                JsonDataEditor(config_path).write(config)
+                return default
 
     def save_config(self, config_data: dict, config_path: str = None) -> None:
         """
@@ -87,7 +103,7 @@ class CoreControlInterface:
                 YmlLanguage(self.self_path, self.language).translate, key_n
             ).format(*args)
 
-    def tr(self, key: str, *args):
+    def tr(self, key: str, *args) -> str:
         """
         获取翻译项 | `translate函数的别称`
 
@@ -119,7 +135,7 @@ class CoreControlInterface:
     # =============
     #   Log Print
     # =============
-    def info(self, msg: any):
+    def info(self, msg: any) -> None:
         """
         输出INFO级别的日志信息。
 
@@ -128,7 +144,7 @@ class CoreControlInterface:
         """
         self.log_system.info(str(msg))
 
-    def warn(self, msg: any):
+    def warn(self, msg: any) -> None:
         """
         输出WARN级别的日志信息。
 
@@ -137,7 +153,7 @@ class CoreControlInterface:
         """
         self.log_system.warn(str(msg))
 
-    def error(self, msg: any):
+    def error(self, msg: any) -> None:
         """
         输出ERROR级别的日志信息。
 
@@ -146,7 +162,7 @@ class CoreControlInterface:
         """
         self.log_system.error(str(msg))
 
-    def debug(self, msg: any):
+    def debug(self, msg: any) -> None:
         """
         输出DEBUG级别的日志信息。
 
@@ -158,7 +174,7 @@ class CoreControlInterface:
     # ============
     #   Command
     # ============
-    def add_command(self, command: str, func: callable):
+    def add_command(self, command: str, func: callable) -> None:
         """
         添加命令到命令行界面中。
 
@@ -170,7 +186,7 @@ class CoreControlInterface:
 
         command_core.add_command(self.sid, command, func)
 
-    def remove_command(self, command: str):
+    def remove_command(self, command: str) -> None:
         """
         移除命令从命令行界面中。
 
@@ -181,7 +197,7 @@ class CoreControlInterface:
 
         command_core.remove_command(self.sid, command)
 
-    def set_prompt(self, prompt: str):
+    def set_prompt(self, prompt: str) -> None:
         """
         设置命令行提示符。
 
@@ -192,7 +208,7 @@ class CoreControlInterface:
 
         command_core.set_prompt(prompt)
 
-    def set_completer_words(self, words: dict):
+    def set_completer_words(self, words: dict) -> None:
         """
         设置命令行补全词典。
 
@@ -203,9 +219,9 @@ class CoreControlInterface:
 
         command_core.set_completer_words(self.sid, words)
 
-    def flush_cli(self):
+    def flush_cli(self) -> None:
         """
-        清空命令行界面。
+        刷新命令行补全词典。
         """
         from connect_core.cli.cli_core import command_core
 
@@ -249,7 +265,7 @@ class CoreControlInterface:
         from connect_core.websocket.client import get_server_id
 
         if self.is_server():
-            return None
+            return "-----"
         else:
             return get_server_id()
 
@@ -276,14 +292,15 @@ class PluginControlInterface(CoreControlInterface):
         self.sid = sid
         self.self_path = self_path
         self.config_path = config_path
+        self.mcdr = mcdr
         self.log_system = LogSystem(
-            self.sid, self.get_config().get("debug", False), mcdr=mcdr
+            self.sid, self.get_config("debug", False), mcdr=mcdr
         )
 
     # ========
     #   Send
     # ========
-    def send_data(self, server_id: str, plugin_id: str, data: dict):
+    def send_data(self, server_id: str, plugin_id: str, data: dict) -> None:
         """
         向指定的服务器发送消息。
 
@@ -305,7 +322,7 @@ class PluginControlInterface(CoreControlInterface):
 
             client_send_data(self.sid, server_id, plugin_id, data)
 
-    def send_file(self, server_id: str, plugin_id: str, file_path: str, save_path: str):
+    def send_file(self, server_id: str, plugin_id: str, file_path: str, save_path: str) -> None:
         """
         向指定的服务器发送文件。
 
