@@ -539,7 +539,7 @@ class ServerDataPacket(DataPacket):
             server_id,
         )
         self.del_recv_packet(server_id, 2)
-        await websocket.close(reason="401")
+        await self._websocket_server.close_connect(server_id, 401)
 
     async def _broadcast_server_list(self):
         await self._broadcast(

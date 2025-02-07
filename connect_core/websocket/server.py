@@ -135,6 +135,10 @@ class WebsocketServer(object):
         except Exception as e:
             raise ValueError(f"Failed to decrypt message for account {account}: {e}")
 
+    async def close_connect(self, server_id: str, reason: int) -> None:
+        """关闭与子服务器的连接并清理相关数据。"""
+        await self.websockets[server_id].close(reason)
+
     async def _close_connection(self, server_id: str = None, websocket=None) -> None:
         """关闭与子服务器的连接并清理相关数据。"""
         if server_id != "-----" and websocket:
