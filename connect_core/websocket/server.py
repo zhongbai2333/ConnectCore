@@ -54,12 +54,18 @@ class WebsocketServer(object):
 
     async def _main(self) -> None:
         """WebSocket 服务器的主循环，负责监听连接并处理通信。"""
-        async with websockets.serve(self._handler, self._host, self._port):
-            _control_interface.info(
-                _control_interface.tr("net_core.service.start_websocket")
+        try:
+            async with websockets.serve(self._handler, self._host, self._port):
+                _control_interface.info(
+                    _control_interface.tr("net_core.service.start_websocket")
+                )
+                self._start_resend()
+                await asyncio.Future()  # 阻塞以保持服务器运行
+        except Exception as e:
+            _control_interface.log_system.error(
+                _control_interface.tr("net_core.service.start_websocket_error")
             )
-            self._start_resend()
-            await asyncio.Future()  # 阻塞以保持服务器运行
+            self.finish_close = True
 
     # ============ Connect ============
     async def _handler(self, websocket) -> None:

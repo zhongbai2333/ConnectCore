@@ -23,6 +23,7 @@ connect_core:
       already_login: "已经有一个子服务器§c连接§r！"
       sub_server_download_finish: "子服务器 §a{}§r 已完成文件下载！"
       file_download_finish_from_other: "来自服务器 §a{}§r 的文件已下载完成！文件已保存至 §a{}§r"
+      start_websocket_error: "§aWebsocket§r 启动失败！可能是由于端口冲突或其他原因！"
   rsa:
     decrypt_error: "§c解密失败§r，密钥错误或数据被篡改！"
   plugin:
