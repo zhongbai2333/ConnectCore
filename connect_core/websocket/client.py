@@ -3,6 +3,7 @@ import sys
 import time
 import json
 import asyncio
+import threading
 import websockets
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.tools import new_thread, auto_trigger
@@ -23,78 +24,72 @@ class WebsocketClient(object):
     """
 
     def __init__(self):
-        """
-        初始化 WebSocket 客户端的基本配置。
-        """
         self.config = _control_interface.get_config()
         self.finish_start = False
         self.finish_close = False
-        self.host = self.config["ip"]  # 服务器 IP 地址
-        self.port = self.config["port"]  # 服务器端口
-        self._main_task = None  # 主任务协程
-        self._receive_task = None  # 接收任务协程
-        self.server_id = None  # 服务器 ID
-        self.last_data_packet = None  # 上一个发送的一个数据包
-        self.data_packet = ClientDataPacket(_control_interface, self)  # 数据包处理类
+        self.host = self.config["ip"]
+        self.port = self.config["port"]
+        self.websocket = None
+        self._main_task = None
+        self._receive_task = None
+        self.server_id = None
+        self.last_data_packet = None
+        self.data_packet = ClientDataPacket(_control_interface, self)
 
-    # ===========
-    #   Control
-    # ===========
+        # 创建独立事件循环和线程
+        self.loop = asyncio.new_event_loop()
+        self.loop_thread = None
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
     def start_server(self) -> None:
         """
-        启动 WebSocket 客户端并运行主循环。
+        启动 WebSocket 客户端：在独立线程运行事件循环，并调度主协程。
         """
-        asyncio.run(self._init_main())
+        self.loop_thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.loop_thread.start()
+        asyncio.run_coroutine_threadsafe(self._init_main(), self.loop)
 
     def stop_server(self) -> None:
         """
-        停止 WebSocket 客户端。
-        如果接收任务正在运行，则取消该任务，否则取消主任务。
+        停止 WebSocket 客户端：取消任务，停止循环并等待线程退出。
         """
         self._start_trigger_websocket_client.stop()
         if self._receive_task:
-            self._receive_task.cancel()
-        else:
-            self._main_task.cancel()
-            self.finish_close = True
+            self.loop.call_soon_threadsafe(self._receive_task.cancel)
+        elif self._main_task:
+            self.loop.call_soon_threadsafe(self._main_task.cancel)
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.loop_thread:
+            self.loop_thread.join()
+        self.finish_close = True
 
-    # ========
-    #   Core
-    # ========
     async def _init_main(self) -> None:
         """
-        初始化并启动主 WebSocket 客户端任务。
+        初始化并运行主连接循环，支持重试机制。
         """
-        self._main_task = asyncio.create_task(self._main())
+        self._main_task = asyncio.current_task(loop=self.loop)
         try:
-            await self._main_task
-            _control_interface.info(
-                _control_interface.tr("net_core.service.stop_websocket")
-            )
-        except asyncio.CancelledError:
-            _control_interface.info(
-                _control_interface.tr("net_core.service.stop_websocket")
-            )
-
-    async def _main(self) -> None:
-        """
-        WebSocket 客户端的主循环，负责尝试与服务器连接。
-        如果连接失败，会每隔一段时间重试。
-        """
-        while True:
-            try:
-                async with websockets.connect(
-                    f"ws://{self.host}:{self.port}"
-                ) as self.websocket:
+            while True:
+                try:
+                    uri = f"ws://{self.host}:{self.port}"
+                    self.websocket = await websockets.connect(uri)
                     self.finish_start = True
                     _control_interface.info(
                         _control_interface.tr("net_core.service.connect_websocket", "")
                     )
                     await self._receive()
-                break
-            except ConnectionRefusedError:
-                self.finish_start = False
-                await asyncio.sleep(1)
+                    break
+                except (ConnectionRefusedError, OSError):
+                    self.finish_start = False
+                    await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            self.finish_close = True
+            _control_interface.info(
+                _control_interface.tr("net_core.service.stop_websocket")
+            )
 
     # ========
     #   recv

@@ -1,4 +1,5 @@
 import websockets
+import threading
 import asyncio
 import shutil
 import json
@@ -29,43 +30,62 @@ class WebsocketServer(object):
         self.last_send_packet = {}
         self.data_packet = ServerDataPacket(_control_interface, self)
 
+        # 手动创建事件循环和线程
+        self.loop = asyncio.new_event_loop()
+        self.server = None
+        self.loop_thread = None
+
     # =========== Control ===========
     def start_server(self) -> None:
-        """启动 WebSocket 服务器。"""
-        asyncio.run(self._init_main())
+        """启动 WebSocket 服务器：启动事件循环线程并调度主协程"""
+        # 启动守护线程
+        self.loop_thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.loop_thread.start()
+        # 在新循环中调度 _main
+        asyncio.run_coroutine_threadsafe(self._main(), self.loop)
 
     def close_server(self) -> None:
-        """关闭 WebSocket 服务器。"""
+        """关闭 WebSocket 服务器：停止重发、关闭 serve、停止循环、等待线程退出"""
+        # 停止自动重发
         self._start_resend.stop()
-        if hasattr(self, "main_task"):
-            self.main_task.cancel()
+
+        if self.server:
+            # 发起关闭 serve
+            self.loop.call_soon_threadsafe(self.server.close)
+            # 同步等待所有连接关闭
+            asyncio.run_coroutine_threadsafe(
+                self.server.wait_closed(), self.loop
+            ).result()
+
+            # 停止事件循环
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        # 等待线程干净退出
+        if self.loop_thread:
+            self.loop_thread.join()
 
     # ========== Core ==========
-    async def _init_main(self) -> None:
-        """初始化并启动主 WebSocket 服务器任务。"""
-        self.main_task = asyncio.create_task(self._main())
-        try:
-            await self.main_task
-        except asyncio.CancelledError:
-            _control_interface.info(
-                _control_interface.tr("net_core.service.stop_websocket")
-            )
-            self.finish_close = True
-
     async def _main(self) -> None:
-        """WebSocket 服务器的主循环，负责监听连接并处理通信。"""
+        """初始化并启动主 WebSocket 服务协程"""
         try:
-            async with websockets.serve(self._handler, self._host, self._port):
-                _control_interface.info(
-                    _control_interface.tr("net_core.service.start_websocket")
-                )
-                self._start_resend()
-                await asyncio.Future()  # 阻塞以保持服务器运行
+            # 不使用 async with，直接获取 server 对象
+            self.server = await websockets.serve(self._handler, self._host, self._port)
+            _control_interface.info(
+                _control_interface.tr("net_core.service.start_websocket")
+            )
+            # 启动定时重发
+            self._start_resend()
+            # 等待服务器关闭
+            await self.server.wait_closed()
         except Exception as e:
             _control_interface.log_system.error(
                 _control_interface.tr("net_core.service.start_websocket_error")
             )
             self.finish_close = True
+
+    def _run_loop(self) -> None:
+        """事件循环线程入口"""
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
 
     # ============ Connect ============
     async def _handler(self, websocket) -> None:
@@ -143,7 +163,14 @@ class WebsocketServer(object):
 
     async def close_connect(self, server_id: str, reason: int) -> None:
         """关闭与子服务器的连接并清理相关数据。"""
-        await self.websockets[server_id].close(reason)
+        ws = self.websockets.get(server_id)
+        if ws:
+            try:
+                # 用 1008（policy violation）或者 1000（normal）等合法码，
+                # 把 http_code 放到 reason 字符串里
+                await ws.close(code=1008, reason=f"HTTP {reason}")
+            except Exception as e:
+                _control_interface.error(f"Close connect error for {server_id}: {e}")
 
     async def _close_connection(self, server_id: str = None, websocket=None) -> None:
         """关闭与子服务器的连接并清理相关数据。"""
@@ -356,7 +383,10 @@ class WebsocketServer(object):
     @new_thread("Parse_Msg")
     def _parse_msg(self, data: dict, websocket) -> None:
         """解析并处理从子服务器接收到的消息。"""
-        asyncio.run(self.data_packet.parse_msg(data, websocket))
+        try:
+            asyncio.run(self.data_packet.parse_msg(data, websocket))
+        except Exception as e:
+            _control_interface.error(f"Parse message error: {e}")
 
     # ========== Tools ==========
     @auto_trigger(interval=30, thread_name="resend")
@@ -373,7 +403,6 @@ class WebsocketServer(object):
 # public
 @new_thread("websocket_server")
 def websocket_server_main(control_interface: "CoreControlInterface"):
-    """初始化 WebSocket 服务器。根据环境选择启动 MCDR 多线程服务器或普通服务器。"""
     global websocket_server, _control_interface
     _control_interface = control_interface
     websocket_server = WebsocketServer()
@@ -381,10 +410,8 @@ def websocket_server_main(control_interface: "CoreControlInterface"):
 
 
 def websocket_server_stop() -> WebsocketServer | None:
-    """停止 WebSocket 服务器。"""
     try:
-        websocket_server.close_server()
-        return websocket_server
+        return websocket_server and websocket_server.close_server()
     except Exception:
         return None
 
