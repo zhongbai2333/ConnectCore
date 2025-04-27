@@ -30,7 +30,7 @@ class CoreControlInterface:
     #  Json Editer
     # =============
     def get_config(
-        self, key: str = "all", default: any = None, config_path: str = None, 
+        self, key: str = "all", default: any = {}, config_path: str = None, 
     ) -> dict:
         """
         获取配置文件，如果配置文件不存在或为空则不会写入到配置文件中，请使用`save_config`初始化

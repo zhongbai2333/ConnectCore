@@ -416,22 +416,30 @@ def websocket_server_stop() -> WebsocketServer | None:
         return None
 
 
+def _schedule_on_ws_loop(coro):
+    """
+    将 coroutine 提交到 websocket_server.loop 并返回 concurrent.futures.Future，
+    如果 loop 没在跑，会在日志里报错。
+    """
+    loop = websocket_server.loop
+    if loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, loop)
+    else:
+        _control_interface.error("WebSocket 事件循环未运行，无法调度协程")
+        return None
+
+
 def send_data(
     f_server_id: str, f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict
 ) -> None:
-    """发送消息到指定的子服务器。"""
-    try:
-        asyncio.run(
-            websocket_server.send_data_to_other_server(
-                f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
-            )
-        )
-    except RuntimeError:
-        asyncio.ensure_future(
-            websocket_server.send_data_to_other_server(
-                f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
-            )
-        )
+    """
+    发送消息到指定的子服务器。不会阻塞当前线程，
+    协程会在后台 loop 中执行。
+    """
+    coro = websocket_server.send_data_to_other_server(
+        f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+    )
+    _schedule_on_ws_loop(coro)
 
 
 @new_thread("SendFile")
@@ -443,19 +451,13 @@ def send_file(
     file_path: str,
     save_path: str,
 ) -> None:
-    """发送文件到指定的子服务器。"""
-    try:
-        asyncio.run(
-            websocket_server.send_file_to_other_server(
-                f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-            )
-        )
-    except RuntimeError:
-        asyncio.ensure_future(
-            websocket_server.send_file_to_other_server(
-                f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-            )
-        )
+    """
+    与 send_data 类似，把文件传输的协程调度到后台 loop。
+    """
+    coro = websocket_server.send_file_to_other_server(
+        f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+    )
+    _schedule_on_ws_loop(coro)
 
 
 def get_server_list() -> list:

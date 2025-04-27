@@ -364,28 +364,27 @@ def websocket_client_stop() -> WebsocketClient | None:
         return None
 
 
+def _schedule_on_client_loop(coro):
+    """
+    将 coroutine 提交到 websocket_client.loop 并返回 concurrent.futures.Future。
+    如果 loop 没有运行，会记录一条错误日志。
+    """
+    loop = websocket_client.loop
+    if loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, loop)
+    else:
+        _control_interface.error("WebSocket 客户端事件循环未运行，无法调度协程")
+        return None
+
+
 def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) -> None:
     """
-    发送消息到指定的子服务器。
-
-    Args:
-        f_plugin_id (str): 插件的唯一标识符
-        t_server_id (str): 子服务器的唯一标识符
-        t_plugin_id (str): 子服务器插件的唯一标识符
-        data (dict): 要发送的消息内容。
+    发送消息到指定的子服务器，不再使用 asyncio.run，而是提交到后台 loop。
     """
-    try:
-        asyncio.run(
-            websocket_client.send_data_to_other_server(
-                f_plugin_id, t_server_id, t_plugin_id, data
-            )
-        )
-    except RuntimeError:
-        asyncio.ensure_future(
-            websocket_client.send_data_to_other_server(
-                f_plugin_id, t_server_id, t_plugin_id, data
-            )
-        )
+    coro = websocket_client.send_data_to_other_server(
+        f_plugin_id, t_server_id, t_plugin_id, data
+    )
+    _schedule_on_client_loop(coro)
 
 
 @new_thread("SendFile")
@@ -397,27 +396,12 @@ def send_file(
     save_path: str,
 ) -> None:
     """
-    发送文件到指定的子服务器。
-
-    Args:
-        f_plugin_id (str): 插件的唯一标识符
-        t_server_id (str): 子服务器的唯一标识符
-        t_plugin_id (str): 子服务器插件的唯一标识符
-        file_path (str): 要发送的文件目录。
-        save_path (str): 要保存的位置。
+    发送文件到指定的子服务器，同样使用线程安全的协程调度。
     """
-    try:
-        asyncio.run(
-            websocket_client.send_file_to_other_server(
-                f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-            )
-        )
-    except RuntimeError:
-        asyncio.ensure_future(
-            websocket_client.send_file_to_other_server(
-                f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-            )
-        )
+    coro = websocket_client.send_file_to_other_server(
+        f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+    )
+    _schedule_on_client_loop(coro)
 
 
 def get_server_id() -> str:
