@@ -416,7 +416,7 @@ class ServerDataPacket(DataPacket):
         if not data["data"].get("payload", None) or self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
-            recv_data(data["to"][1], data["to"][0], data["data"].get("payload", None))
+            recv_data(data["to"][1], data["from"][0], data["data"].get("payload", None))
             await self._send_data_response(websocket, server_id)
         else:
             await self._send_data_error(websocket, server_id)
@@ -464,7 +464,7 @@ class ServerDataPacket(DataPacket):
                 ):
                     recv_file(
                         data["to"][1],
-                        data["to"][0],
+                        data["from"][0],
                         data["data"].get("payload")["save_path"],
                     )
                 else:
@@ -749,7 +749,7 @@ class ClientDataPacket(DataPacket):
                 ):
                     recv_file(
                         data["to"][1],
-                        data["to"][0],
+                        data["from"][0],
                         data["data"].get("payload")["save_path"],
                     )
                 else:
