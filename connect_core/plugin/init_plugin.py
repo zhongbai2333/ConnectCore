@@ -144,6 +144,9 @@ class PluginLoader:
     def handle_event(self, event: str, plugin_id: str = None, *args):
         """处理插件事件，通知所有插件，如 new_connect, del_connect, recv_data 等"""
         if plugin_id:
+            if plugin_id not in self.plugins.keys():
+                _control_interface.log_system.error(f"Unkown Plugin ID: {plugin_id}")
+                return
             plugin_module = self.plugins[plugin_id]["module"]
             if hasattr(plugin_module, event):
                 try:
