@@ -431,6 +431,9 @@ class ServerDataPacket(DataPacket):
         if self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
+            os.makedirs(
+                os.path.dirname(data["data"].get("payload")["save_path"]), exist_ok=True
+            )
             self._wait_file_list[server_id] = open(
                 data["data"].get("payload")["save_path"], "wb"
             )
@@ -718,6 +721,9 @@ class ClientDataPacket(DataPacket):
         if self.verify_md5_checksum(
             data["data"].get("payload"), data["data"].get("checksum")
         ):
+            os.makedirs(
+                os.path.dirname(data["data"].get("payload")["save_path"]), exist_ok=True
+            )
             self._wait_file = open(data["data"].get("payload")["save_path"], "wb")
         else:
             await self._send_file_error()
