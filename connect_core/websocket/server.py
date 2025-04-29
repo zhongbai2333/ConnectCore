@@ -260,6 +260,10 @@ class WebsocketServer(object):
             for i in self.servers_info.keys():
                 self.last_send_packet[i] = msg
             await self.broadcast(msg, except_id)
+        elif t_server_id == "-----":
+            _control_interface.log_system.error(
+                "Unable to send data from the main server to the main server"
+            )
         else:
             self.last_send_packet[t_server_id] = msg
             await self.send(msg[t_server_id], self.websockets[t_server_id], t_server_id)
@@ -352,6 +356,10 @@ class WebsocketServer(object):
                         },
                     ),
                     except_id,
+                )
+            elif t_server_id == "-----":
+                _control_interface.log_system.error(
+                    "Unable to send file from the main server to the main server"
                 )
             else:
                 await self.send(
