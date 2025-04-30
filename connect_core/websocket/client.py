@@ -241,7 +241,7 @@ class WebsocketClient(object):
             t_plugin_id (str): 子服务器插件的唯一标识符
             data (dict): 要发送的消息内容。
         """
-        if t_server_id not in self.data_packet.server_list:
+        if t_server_id != "all" and t_server_id != "-----" and t_server_id not in self.data_packet.server_list:
             _control_interface.log_system.error(
                 f"Unable to send data to server {t_server_id}"
             )
@@ -273,7 +273,7 @@ class WebsocketClient(object):
             file_path (str): 要发送的文件目录。
             save_path (str): 要保存的位置。
         """
-        if t_server_id not in self.data_packet.server_list:
+        if t_server_id != "all" and t_server_id != "-----" and t_server_id not in self.data_packet.server_list:
             _control_interface.log_system.error(
                 f"Unable to send data to server {t_server_id}"
             )
