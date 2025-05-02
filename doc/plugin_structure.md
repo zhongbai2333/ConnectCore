@@ -75,28 +75,28 @@
 
  3. **new_connect**
 
-    在由新的子服务器连接时调用，传入子服务器列表。
+    在由新的子服务器连接时调用，传入子服务器ID。
 
     **Args:**
-    > `server_list`: 子服务器列表，包含子服务器的ID。
+    > `server_list`: 子服务器ID。
 
     ```python
-    def new_connect(server_list):
+    def new_connect(server_id):
         """有新的连接"""
-        _control_interface.info(server_list)
+        _control_interface.info(server_id)
     ```
 
  4. **del_connect**
 
-    在有子服务器断开连接时调用，传入子服务器列表。
+    在有子服务器断开连接时调用，传入子服务器ID。
 
     **Args:**
-    > `server_list`: 子服务器列表，包含子服务器的ID。
+    > `server_list`: 子服务器ID。
 
     ```python
-    def del_connect(server_list):
+    def del_connect(server_id):
         """有断开连接"""
-        _control_interface.info(server_list)
+        _control_interface.info(server_id)
     ```
 
  5. **connected**

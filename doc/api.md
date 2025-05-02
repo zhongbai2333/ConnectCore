@@ -642,7 +642,7 @@
         Args:
             server_id (str): 目标服务器的唯一标识符。
             plugin_id (str): 目标服务器插件的唯一标识符
-            data (str): 要发送的数据。
+            data (dict): 要发送的数据。
         """
     ```
 

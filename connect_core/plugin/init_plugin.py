@@ -168,11 +168,11 @@ class PluginLoader:
                         )
 
     # 事件处理函数，通知所有插件
-    def new_connect(self, server_list: list):
-        self.handle_event("new_connect", None, server_list)
+    def new_connect(self, server_id: str):
+        self.handle_event("new_connect", None, server_id)
 
-    def del_connect(self, server_list: list):
-        self.handle_event("del_connect", None, server_list)
+    def del_connect(self, server_id: str):
+        self.handle_event("del_connect", None, server_id)
 
     def connected(self):
         self.handle_event("connected")
@@ -210,26 +210,26 @@ def mcdr_add_entry_point(sid: str, entry_point: str) -> bool:
     return _plugin_loader.mcdr_add_entry_point(sid, entry_point)
 
 
-def new_connect(server_list: list) -> None:
+def new_connect(server_id: str) -> None:
     """
     新的连接
 
     Args:
         sid (str): 插件ID
-        server_list (list): 服务器列表
+        server_id (str): 新服务器ID
     """
-    _plugin_loader.new_connect(server_list)
+    _plugin_loader.new_connect(server_id)
 
 
-def del_connect(server_list: list) -> None:
+def del_connect(server_id: str) -> None:
     """
     断开的连接
 
     Args:
         sid (str): 插件ID
-        server_list (list): 服务器列表
+        server_id (str): 新服务器ID
     """
-    _plugin_loader.del_connect(server_list)
+    _plugin_loader.del_connect(server_id)
 
 
 def connected():

@@ -184,14 +184,14 @@ class WebsocketServer(object):
 
             self.data_packet.del_server_id(server_id)
 
-            del_connect(list(self.servers_info.keys()))
+            del_connect(server_id)
 
             await self.broadcast(
                 self.data_packet.get_data_packet(
                     self.data_packet.TYPE_DEL_LOGIN,
                     self.data_packet.DEFAULT_ALL,
                     self.data_packet.DEFAULT_SERVER,
-                    {"server_list": list(self.servers_info.keys())},
+                    {"server_id": server_id},
                 )
             )
             _control_interface.info(

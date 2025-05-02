@@ -407,8 +407,8 @@ class ServerDataPacket(DataPacket):
             self._websocket_server.servers_info[server_id] = data["data"].get("payload")
             _control_interface.info(f"Server {server_id} Login")
             await self._send_login_response(websocket, server_id)
-            new_connect(list(self._websocket_server.servers_info.keys()))
-            await self._broadcast_server_list()
+            new_connect(server_id)
+            await self._broadcast_server_list(server_id)
         else:
             await self._send_login_error(websocket, server_id)
 
@@ -544,13 +544,13 @@ class ServerDataPacket(DataPacket):
         self.del_recv_packet(server_id, 2)
         await self._websocket_server.close_connect(server_id, 401)
 
-    async def _broadcast_server_list(self):
+    async def _broadcast_server_list(self, server_id):
         await self._broadcast(
             self.get_data_packet(
                 self.TYPE_NEW_LOGIN,
                 self.DEFAULT_ALL,
                 self.DEFAULT_SERVER,
-                {"server_list": list(self._websocket_server.servers_info.keys())},
+                {"server_id": server_id},
             )
         )
 
@@ -691,11 +691,11 @@ class ClientDataPacket(DataPacket):
         connected()
 
     async def _handle_new_login(self, data):
-        new_connect(data["data"].get("payload")["server_list"])
+        new_connect(data["data"].get("payload")["server_id"])
         self.server_list = data["data"].get("payload")["server_list"]
 
     async def _handle_del_login(self, data):
-        del_connect(data["data"].get("payload")["server_list"])
+        del_connect(data["data"].get("payload")["server_id"])
         self.server_list = data["data"].get("payload")["server_list"]
 
     async def _handle_login_error(self, data):
