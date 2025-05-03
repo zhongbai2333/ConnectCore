@@ -21,6 +21,7 @@ connect_core:
       disconnect_from_unknown_websocket: "Main Websockets 已断开一个§e陌生的连接§r！"
       error_password: "§c密钥错误§r！请修改密钥后重载插件！"
       already_login: "已经有一个子服务器§c连接§r！"
+      already_login_server: "重复的服务器ID §e{}§4 已被断开连接！"
       sub_server_download_finish: "子服务器 §a{}§r 已完成文件下载！"
       file_download_finish_from_other: "来自服务器 §a{}§r 的文件已下载完成！文件已保存至 §a{}§r"
       start_websocket_error: "§aWebsocket§r 启动失败！可能是由于端口冲突或其他原因！"

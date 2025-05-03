@@ -109,8 +109,13 @@ class WebsocketServer(object):
                     )
                     await websocket.close(reason="200")
         except websockets.exceptions.ConnectionClosed as e:
-            if str(e) == "sent 1000 (OK) 401; then received 1000 (OK) 401":
-                pass
+            code = getattr(e, "code", None)
+            reason = getattr(e, "reason", "")
+            # 重复登录 -> code=1008, reason 包含 "401"
+            if code == 1008 and "401" in reason:
+                _control_interface.error(_control_interface.tr("net_core.service.already_login_server", server_id))
+                # 不走正常断开逻辑
+                return
             else:
                 if "account" in msg.keys():
                     await self._close_connection(server_id, websocket)
@@ -161,9 +166,10 @@ class WebsocketServer(object):
         except Exception as e:
             raise ValueError(f"Failed to decrypt message for account {account}: {e}")
 
-    async def close_connect(self, server_id: str, reason: int) -> None:
+    async def close_connect(self, server_id: str, reason: int, ws=None) -> None:
         """关闭与子服务器的连接并清理相关数据。"""
-        ws = self.websockets.get(server_id)
+        if ws is None:
+            ws = self.websockets.get(server_id)
         if ws:
             try:
                 # 用 1008（policy violation）或者 1000（normal）等合法码，
@@ -400,7 +406,9 @@ class WebsocketServer(object):
     def _parse_msg(self, data: dict, websocket) -> None:
         """解析并处理从子服务器接收到的消息。"""
         try:
-            asyncio.run(self.data_packet.parse_msg(data, websocket))
+            asyncio.run_coroutine_threadsafe(
+                self.data_packet.parse_msg(data, websocket), self.loop
+            )
         except Exception as e:
             _control_interface.error(f"Parse message error: {e}")
 
@@ -408,7 +416,10 @@ class WebsocketServer(object):
     @auto_trigger(interval=30, thread_name="resend")
     def _start_resend(self) -> None:
         """启动PING PONG数据包服务"""
-        asyncio.run(self._resend())
+        try:
+            asyncio.run_coroutine_threadsafe(self._resend(), self.loop)
+        except Exception as e:
+            _control_interface.error(f"Resend scheduling error: {e}")
 
     def get_history_data_packet(self, server_id) -> list:
         """获取历史数据包"""

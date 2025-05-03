@@ -94,41 +94,48 @@ class WebsocketClient(object):
     # ========
     #   recv
     # ========
-    async def _get_recv(self) -> None:
+    async def _get_recv(self) -> str | None:
         """
-        从 WebSocket 服务器接收消息。
-        如果接收超时或连接关闭，将重新初始化客户端。
+        从服务器收消息；如果是超时就继续等待，
+        如果是 401（重复登录）就停掉客户端并返回 None，
+        其它情况才走断线重连逻辑。
         """
         while True:
             try:
                 return await asyncio.wait_for(self.websocket.recv(), timeout=4)
             except asyncio.TimeoutError:
-                pass
-            except (
-                websockets.ConnectionClosedError,
-                websockets.ConnectionClosedOK,
-            ) as e:
-                if str(e) == "received 1000 (OK) 401; then sent 1000 (OK) 401":
+                # 只是超时，继续等
+                continue
+            except websockets.ConnectionClosed as e:
+                code = getattr(e, "code", None)
+                reason = getattr(e, "reason", "")
+                # —— 重复登录（Already Login），服务器发 code=1008, reason 包含 "401"
+                if code == 1008 and "401" in reason:
                     _control_interface.error(
                         _control_interface.tr("net_core.service.already_login")
                     )
+                    # 停掉自己，不再重连
                     self.stop_server()
-                    return
-                elif str(e) != "received 1000 (OK) 400; then sent 1000 (OK) 400":
-                    _control_interface.info(
-                        _control_interface.tr("net_core.service.disconnect_websocket")
-                        + str(e)
-                    )
-                    self._start_trigger_websocket_client.stop()
-                    disconnected()
-                    websocket_client_main(_control_interface)
-                    return
-                else:
+                    return None
+
+                # —— 密码错误分支，如果你也用 1008+HTTP 400
+                if code == 1008 and "400" in reason:
                     _control_interface.error(
                         _control_interface.tr("net_core.service.error_password")
                     )
                     self.stop_server()
-                    return
+                    return None
+
+                # —— 其他任何关闭，都走断线重连
+                _control_interface.info(
+                    _control_interface.tr("net_core.service.disconnect_websocket")
+                    + f" code={code} reason={reason}"
+                )
+                # 停了定时器，触发上层重连逻辑
+                self._start_trigger_websocket_client.stop()
+                disconnected()
+                websocket_client_main(_control_interface)
+                return None
 
     async def _receive(self) -> None:
         """

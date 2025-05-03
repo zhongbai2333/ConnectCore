@@ -21,8 +21,10 @@ connect_core:
       disconnect_from_unknown_websocket: "Main Websockets has disconnected an §eunknown connection§r!"
       error_password: "§cIncorrect key§r! Please change the key and reload the plugin!"
       already_login: "A sub-server is already §cconnected§r!"
+      already_login_server: "Duplicate server ID §e{}§4 has been disconnected!"
       sub_server_download_finish: "Sub-server §a{}§r has finished downloading files!"
       file_download_finish_from_other: "Files from server §a{}§r have been downloaded! Files saved to §a{}§r"
+      start_websocket_error: "§aWebsocket§r failed to start! It may be due to a port conflict or another issue!"
   rsa:
     decrypt_error: "§cDecryption failed§r, incorrect key or data has been tampered with!"
   plugin:

@@ -542,7 +542,7 @@ class ServerDataPacket(DataPacket):
             server_id,
         )
         self.del_recv_packet(server_id, 2)
-        await self._websocket_server.close_connect(server_id, 401)
+        await self._websocket_server.close_connect(server_id, 401, websocket)
 
     async def _broadcast_server_list(self, server_id):
         await self._broadcast(
@@ -692,11 +692,11 @@ class ClientDataPacket(DataPacket):
 
     async def _handle_new_login(self, data):
         new_connect(data["data"].get("payload")["server_id"])
-        self.server_list = data["data"].get("payload")["server_list"]
+        self.server_list.append(data["data"].get("payload")["server_id"])
 
     async def _handle_del_login(self, data):
         del_connect(data["data"].get("payload")["server_id"])
-        self.server_list = data["data"].get("payload")["server_list"]
+        self.server_list.pop(data["data"].get("payload")["server_id"])
 
     async def _handle_login_error(self, data):
         _control_interface.error(f"Login Error: {data["data"]["payload"]["error"]}")
