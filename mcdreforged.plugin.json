@@ -1,6 +1,6 @@
 {
   "id": "connect_core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "name": "ConnectCore",
   "description": {
     "en_us": "Connect your Minecraft Server together and control it.",
