@@ -99,7 +99,23 @@
         _control_interface.info(server_id)
     ```
 
- 5. **connected**
+ 5. **websockets_started**
+
+    websocket启动/连接成功
+    服务端为启动成功
+    客户端为连接成功
+
+    ```python
+    def websockets_started():
+        """
+        websocket启动/连接成功
+        服务端为启动成功
+        客户端为连接成功
+        """
+        _control_interface.info("Websockets Started!")
+    ```
+
+ 6. **connected**
 
     子服务器与主服务器连接成功时调用，无传参
 
@@ -109,7 +125,7 @@
         _control_interface.info("Connected!")
     ```
 
- 6. **disconnected**
+ 7. **disconnected**
 
     子服务器与主服务器断开连接时调用，无传参
 
@@ -119,7 +135,7 @@
         _control_interface.info("Disconnected!")
     ```
 
- 7. **recv_data**
+ 8. **recv_data**
 
     接收子服务器发送的数据包时调用，传入子服务器ID和数据包。
 
@@ -133,7 +149,7 @@
         _control_interface.info(data)
     ```
 
- 8. **recv_file**
+ 9. **recv_file**
 
     接收子服务器发送的文件时调用，传入子服务器ID和文件保存路径。
 
