@@ -7,7 +7,7 @@ import os
 from connect_core.websocket.data_packet import ServerDataPacket
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.account.register_system import get_register_password
-from connect_core.plugin.init_plugin import del_connect
+from connect_core.plugin.init_plugin import del_connect, websockets_started
 from connect_core.tools import new_thread, auto_trigger
 from typing import TYPE_CHECKING
 
@@ -72,6 +72,7 @@ class WebsocketServer(object):
             _control_interface.info(
                 _control_interface.tr("net_core.service.start_websocket")
             )
+            websockets_started()
             # 启动定时重发
             self._start_resend()
             # 等待服务器关闭

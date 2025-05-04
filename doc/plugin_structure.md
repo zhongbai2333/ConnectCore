@@ -280,7 +280,23 @@
         _control_interface.info("Disconnected!")
     ```
 
- 5. **recv_data**
+ 5. **websockets_started**
+
+    websocket启动/连接成功
+    服务端为启动成功
+    客户端为连接成功
+
+    ```python
+    def websockets_started():
+        """
+        websocket启动/连接成功
+        服务端为启动成功
+        客户端为连接成功
+        """
+        _control_interface.info("Websockets Started!")
+    ```
+
+ 6. **recv_data**
 
     接收子服务器发送的数据包时调用，传入子服务器ID和数据包。
 
@@ -294,7 +310,7 @@
         _control_interface.info(data)
     ```
 
- 6. **recv_file**
+ 7. **recv_file**
 
     接收子服务器发送的文件时调用，传入子服务器ID和文件保存路径。
 

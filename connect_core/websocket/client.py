@@ -8,7 +8,7 @@ import websockets
 from connect_core.aes_encrypt import aes_encrypt, aes_decrypt
 from connect_core.tools import new_thread, auto_trigger
 from connect_core.websocket.data_packet import ClientDataPacket
-from connect_core.plugin.init_plugin import disconnected
+from connect_core.plugin.init_plugin import disconnected, websockets_started
 
 from typing import TYPE_CHECKING
 
@@ -80,6 +80,7 @@ class WebsocketClient(object):
                     _control_interface.info(
                         _control_interface.tr("net_core.service.connect_websocket", "")
                     )
+                    websockets_started()
                     await self._receive()
                     break
                 except (ConnectionRefusedError, OSError):

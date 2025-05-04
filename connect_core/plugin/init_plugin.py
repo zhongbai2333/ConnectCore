@@ -180,6 +180,9 @@ class PluginLoader:
     def disconnected(self):
         self.handle_event("disconnected")
 
+    def websockets_started(self):
+        self.handle_event("websockets_started")
+
     def recv_data(self, plugin_id: str, from_server_id: str, data: dict):
         self.handle_event("recv_data", plugin_id, from_server_id, data)
 
@@ -244,6 +247,15 @@ def disconnected():
     断开连接
     """
     _plugin_loader.disconnected()
+
+
+def websockets_started():
+    """
+    websocket启动/连接成功
+    服务端为启动成功
+    客户端为连接成功
+    """
+    _plugin_loader.websockets_started()
 
 
 def recv_data(sid: str, from_server_id: str, data: dict):
