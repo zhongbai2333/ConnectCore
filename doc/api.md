@@ -59,6 +59,133 @@
     """
     ```
 
+## Config
+
+`connect_core.api.config`
+
+配置文件生成相关代码
+
+ 1. `Exception` **ConfigError**
+
+    配置文件相关异常基类
+
+    ```python
+    class ConfigError(Exception):
+        """配置相关异常基类"""
+    ```
+
+ 2. `Exception` **ConfigTypeError**
+
+    配置类型错误
+
+    ```python
+    class ConfigTypeError(ConfigError):
+        """配置类型错误"""
+    ```
+
+ 3. `Exception` **ConfigValidationError**
+
+    配置验证失败
+
+    ```python
+    class ConfigValidationError(ConfigError):
+        """配置验证失败"""
+    ```
+
+ 4. `Class` **Field**
+
+    配置字段描述符
+
+    ```python
+    class Field:
+        """配置字段描述符"""
+
+        def __init__(self, default: Any, description: str = ""):
+            self.default = default
+            self.description = description
+    ```
+
+ 5. `Class` **BaseConfig**
+
+    配置文件主基类
+
+    **Args:**
+    >config_path (str): 配置文件保存目录
+
+    ```python
+    class BaseConfig(metaclass=BaseConfigMeta):
+        __config_path__: str = "config.yml"  # 类级默认路径
+
+        def __init__(self, config_path: str = None, **kwargs):
+            """
+            初始化类，保存路径
+
+            Args:
+                config_path (str): 路径目录, 默认为"config.yml"
+            """
+    ```
+
+ 6. **BaseConfig.load**
+
+    加载配置文件
+
+    **Args:**
+    >config_path (str): 配置文件保存目录
+
+    ```python
+    @classmethod
+    def load(cls: Type[T], config_path: str = None) -> T:
+        """
+        从YAML加载配置，若缺少字段则自动补全并写回文件
+        
+        Args:
+            config_path (str): 配置文件保存路径, 默认类__config_path__相关内部变量
+        """
+    ```
+
+ 7. **BaseConfig.save**
+
+    保存配置文件
+
+    **Args:**
+    >config_path (str): 配置文件保存目录
+
+    ```python
+    def save(self, config_path: str = None):
+        """
+        保存为带注释的YAML
+        
+        Args:
+            config_path (str): 配置文件保存路径, 默认类__config_path__相关内部变量
+        """
+    ```
+
+ 8. **BaseConfig.update**
+
+    批量更新配置项
+
+    **Args:**
+    >**kwargs: 配置项
+
+    ```python
+    def update(self, **kwargs):
+        """
+        批量更新配置
+        
+        Args:
+            kwargs: 配置项
+        """
+    ```
+
+ 9. **BaseConfig.print_config**
+
+    打印当前所有配置项
+
+    ```python
+    def print_config(self):
+        """打印当前配置"""
+    ```
+
 ## Data Packet
 
 `connect_core.api.data_packet`
