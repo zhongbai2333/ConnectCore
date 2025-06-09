@@ -2,7 +2,7 @@ name: CI for MCDR Plugin
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
     tags: [ "v*" ]
     paths: 
       - '**.py'          # 所有 Python 文件
