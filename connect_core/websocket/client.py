@@ -54,16 +54,41 @@ class WebsocketClient(object):
 
     def stop_server(self) -> None:
         """
-        停止 WebSocket 客户端：取消任务，停止循环并等待线程退出。
+        停止 WebSocket 客户端：优雅地 close 连接、取消任务、停止事件循环并等待线程退出。
         """
+        # 1. 停掉心跳定时器
         self._start_trigger_websocket_client.stop()
-        if self._receive_task:
-            self.loop.call_soon_threadsafe(self._receive_task.cancel)
-        elif self._main_task:
-            self.loop.call_soon_threadsafe(self._main_task.cancel)
+
+        # 2. 在 loop 里调度一个协程来 cancel tasks + close websocket
+        async def _graceful_shutdown():
+            # 2.1 取消正在 recv/send 的任务
+            if self._receive_task:
+                self._receive_task.cancel()
+            if self._main_task:
+                self._main_task.cancel()
+
+            # 2.2 优雅地 close WebSocket 连接（发 CLOSE 帧）
+            if self.websocket and not self.websocket.closed:
+                try:
+                    await self.websocket.close(code=1000, reason="Client shutdown")
+                except Exception:
+                    pass
+
+        # 提交 shutdown 协程，并等待它完成（超时以防卡住）
+        if self.loop.is_running():
+            fut = asyncio.run_coroutine_threadsafe(_graceful_shutdown(), self.loop)
+            try:
+                fut.result(timeout=3)
+            except Exception:
+                pass
+
+        # 3. 停止事件循环
         self.loop.call_soon_threadsafe(self.loop.stop)
+
+        # 4. 等线程退出
         if self.loop_thread:
-            self.loop_thread.join()
+            self.loop_thread.join(timeout=3)
+
         self.finish_close = True
 
     async def _init_main(self) -> None:
@@ -249,6 +274,8 @@ class WebsocketClient(object):
             t_plugin_id (str): 子服务器插件的唯一标识符
             data (dict): 要发送的消息内容。
         """
+        if not self.server_id:
+            return
         if t_server_id != "all" and t_server_id != "-----" and t_server_id not in self.data_packet.server_list:
             _control_interface.log_system.error(
                 f"Unable to send data to server {t_server_id}"
@@ -281,6 +308,8 @@ class WebsocketClient(object):
             file_path (str): 要发送的文件目录。
             save_path (str): 要保存的位置。
         """
+        if not self.server_id:
+            return
         if t_server_id != "all" and t_server_id != "-----" and t_server_id not in self.data_packet.server_list:
             _control_interface.log_system.error(
                 f"Unable to send data to server {t_server_id}"
@@ -335,14 +364,15 @@ class WebsocketClient(object):
     # =============
     @new_thread("Prase_Msg")
     def _parse_msg(self, data: dict) -> None:
-        """
-        解析并处理从服务器接收到的消息。
-        如果消息中包含服务器 ID，则更新客户端的服务器 ID。
-
-        Args:
-            data (dict): 从服务器接收到的消息内容。
-        """
-        asyncio.run(self.data_packet.parse_msg(data))
+        # 把 parse_msg 调度到 self.loop 里执行，返回一个 concurrent.futures.Future
+        future = asyncio.run_coroutine_threadsafe(
+            self.data_packet.parse_msg(data), self.loop
+        )
+        # （可选）等待它完成或捕获异常
+        try:
+            future.result(timeout=5)
+        except Exception as e:
+            _control_interface.error(f"Parse Msg Error: {e}")
 
     # =========
     #   Tools

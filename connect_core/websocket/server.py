@@ -45,23 +45,43 @@ class WebsocketServer(object):
         asyncio.run_coroutine_threadsafe(self._main(), self.loop)
 
     def close_server(self) -> None:
-        """关闭 WebSocket 服务器：停止重发、关闭 serve、停止循环、等待线程退出"""
-        # 停止自动重发
+        """
+        关闭 WebSocket 服务器：优雅地 cancel 重发、关闭所有连接、
+        停止 serve、停止 loop 并等待线程退出。
+        """
+        # 1. 停掉自动重发定时器
         self._start_resend.stop()
 
-        if self.server:
-            # 发起关闭 serve
-            self.loop.call_soon_threadsafe(self.server.close)
-            # 同步等待所有连接关闭
-            asyncio.run_coroutine_threadsafe(
-                self.server.wait_closed(), self.loop
-            ).result()
+        # 2. 在事件循环中调度优雅关机协程，并等待它完成
+        async def _graceful_shutdown():
+            # 2.1 取消掉所有正在跑的任务（如果有存）
+            #     （如果你自己存了 _main_task、_handler_task 等，也一并 cancel）
+            # 2.2 优雅地 close 每一个客户端连接
+            for ws in list(self.websockets.values()):
+                try:
+                    await ws.close(code=1000, reason="Server shutdown")
+                except Exception:
+                    pass
+            # 2.3 关闭 serve 本身，停止接收新连接
+            if self.server:
+                self.server.close()
+                await self.server.wait_closed()
 
-            # 停止事件循环
+        if self.loop.is_running():
+            f = asyncio.run_coroutine_threadsafe(_graceful_shutdown(), self.loop)
+            try:
+                # 最多等 3 秒，防止卡住
+                f.result(timeout=3)
+            except Exception:
+                pass
+
+        # 3. 停掉事件循环
         self.loop.call_soon_threadsafe(self.loop.stop)
-        # 等待线程干净退出
+        # 4. 等线程退出
         if self.loop_thread:
-            self.loop_thread.join()
+            self.loop_thread.join(timeout=3)
+
+        self.finish_close = True
 
     # ========== Core ==========
     async def _main(self) -> None:
@@ -93,7 +113,9 @@ class WebsocketServer(object):
         """处理每个 WebSocket 连接的协程。"""
         try:
             while True:
-                msg = json.loads(await websocket.recv())
+                recv = await websocket.recv()
+                _control_interface.log_system.debug("recv:" + str(recv))
+                msg = json.loads(recv)
                 if "account" in msg.keys():
                     server_id = msg["account"]
                     await self._process_message(msg, websocket, server_id)

@@ -214,10 +214,15 @@ class JsonDataEditor:
                 )  # 使用 exist_ok=True 避免 FileExistsError
             self._write_data()
 
-    def _read_data(self):
-        """读取 JSON 文件内容并返回一个字典"""
-        with open(self.filepath, "r", encoding="utf-8") as file:
-            return json.load(file)
+    def _read_data(self) -> Dict[str, Any]:
+        """读取 JSON 文件内容并返回一个字典，如果内容无效则重置并返回空字典"""
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            # 文件为空、格式错误或突然被删了：重置为 {} 并写回磁盘
+            print(f"Json File {self.filepath} Can't Read!")
+            return {}
 
     def _write_data(self, data={}):
         """将字典写入 JSON 文件"""
