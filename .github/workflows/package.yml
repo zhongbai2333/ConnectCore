@@ -5,10 +5,10 @@ on:
     branches: [ "main" ]
     tags: [ "v*" ]
     paths: 
-    - '**.py'          # 所有 Python 文件
-    - 'requirements.txt' # 依赖清单
-    - 'mcdreforged.plugin.json'
-    - '.github/workflows/package.yml' # CI 文件
+      - '**.py'          # 所有 Python 文件
+      - 'requirements.txt' # 依赖清单
+      - 'mcdreforged.plugin.json'
+      - '.github/workflows/package.yml' # CI 文件
   pull_request:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
     - name: Setup python
       uses: actions/setup-python@v5
       with:
-        python-version: 3.9
+        python-version: 3.13
 
     - uses: actions/cache@v4
       with:
@@ -114,4 +114,4 @@ jobs:
         tag_name: ${{ github.ref_name }}
         name: ConnectCore ${{ github.ref_name }}
         body: ${{ steps.generate_notes.outputs.result }}
-        files: package/*.mcdr
+        files: package/*.pyz
