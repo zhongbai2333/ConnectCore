@@ -399,10 +399,13 @@ def send_data(f_plugin_id: str, t_server_id: str, t_plugin_id: str, data: dict) 
     """
     发送消息到指定的子服务器，不再使用 asyncio.run，而是提交到后台 loop。
     """
-    coro = websocket_client.send_data_to_other_server(
-        f_plugin_id, t_server_id, t_plugin_id, data
-    )
-    _schedule_on_client_loop(coro)
+    try:
+        coro = websocket_client.send_data_to_other_server(
+            f_plugin_id, t_server_id, t_plugin_id, data
+        )
+        _schedule_on_client_loop(coro)
+    except NameError:
+        pass
 
 
 @new_thread("SendFile")
@@ -416,10 +419,13 @@ def send_file(
     """
     发送文件到指定的子服务器，同样使用线程安全的协程调度。
     """
-    coro = websocket_client.send_file_to_other_server(
-        f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-    )
-    _schedule_on_client_loop(coro)
+    try:
+        coro = websocket_client.send_file_to_other_server(
+            f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+        )
+        _schedule_on_client_loop(coro)
+    except NameError:
+        pass
 
 
 def get_server_id() -> str:

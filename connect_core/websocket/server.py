@@ -464,10 +464,13 @@ def send_data(
     发送消息到指定的子服务器。不会阻塞当前线程，
     协程会在后台 loop 中执行。
     """
-    coro = websocket_server.send_data_to_other_server(
-        f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
-    )
-    _schedule_on_ws_loop(coro)
+    try:
+        coro = websocket_server.send_data_to_other_server(
+            f_server_id, f_plugin_id, t_server_id, t_plugin_id, data
+        )
+        _schedule_on_ws_loop(coro)
+    except NameError:
+        pass
 
 
 @new_thread("SendFile")
@@ -482,10 +485,13 @@ def send_file(
     """
     与 send_data 类似，把文件传输的协程调度到后台 loop。
     """
-    coro = websocket_server.send_file_to_other_server(
-        f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
-    )
-    _schedule_on_ws_loop(coro)
+    try:
+        coro = websocket_server.send_file_to_other_server(
+            f_server_id, f_plugin_id, t_server_id, t_plugin_id, file_path, save_path
+        )
+        _schedule_on_ws_loop(coro)
+    except NameError:
+        pass
 
 
 def get_server_list() -> list:
