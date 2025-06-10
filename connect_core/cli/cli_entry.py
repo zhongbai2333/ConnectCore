@@ -76,7 +76,7 @@ def _initialization_config() -> None:
         port = input(
             translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
         )
-        while not (0 <= port <= 65535):
+        while not (0 <= int(port) <= 65535):
             if not port:
                 break
             print(translate_temp["connect_core"]["cli"]["initialization_config"]["invalid_port"])
