@@ -1,6 +1,6 @@
-cryptography>=44.0.0
-mcdreforged>=2.14.4
-prompt_toolkit>=3.0.50
-psutil>=6.1.1
-PyYAML>=6.0.2
-websockets>=14.2
+cryptography
+mcdreforged
+prompt_toolkit
+psutil
+PyYAML
+websockets
