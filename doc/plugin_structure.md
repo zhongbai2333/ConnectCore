@@ -1,26 +1,60 @@
 # Plugin Structure
 
-`MCDR模式`和`混合模式`(同时支持`MCDR模式`和`独立模式`)的插件可以上传至`MCDR`的`插件列表收集仓库`，这是符合规范的。
+本文档描述 `Project-Refactoring-Codespace` 当前版本的插件组织方式、manifest 规范、加载行为与模式差异。
 
-但是如果只支持`独立模式`就请勿上传，因为这不符合`插件列表收集仓库`的贡献标准，谢谢！
+> ⚠️ `MCDR模式`和`混合模式`下的插件可以上传至 MCDR 的[插件列表收集仓库](https://github.com/MCDReforged/PluginCatalogue)，但如果只支持`独立模式`就**请勿上传**，因为不符合 MCDR 插件收录标准。
+
+---
+
+## 运行模式概览
+
+ConnectCore 当前有两种主要使用方式：
+
+1. **独立模式**
+   - ConnectCore 自己加载并管理插件
+   - 会扫描插件目录中的目录插件、`.mcdr` 插件包和 `.pyz` 插件包
+   - 支持依赖分析、拓扑加载、级联卸载 / 重载
+
+2. **MCDR 模式**
+   - ConnectCore 本身作为 MCDR 插件运行
+   - 第三方 MCDR 插件由 **MCDR** 管理，而不是由 ConnectCore 插件加载器管理
+   - 你可以通过 `get_plugin_control_interface()` 获取网络发送能力
+
+> 如果你的插件同时想兼容独立模式和 MCDR 模式，可以采用“混合模式”打包：同时提供 `connectcore.plugin.json` 和 `mcdreforged.plugin.json`。
+
+---
 
 ## 独立模式
 
-独立模式下，**ConnectCore**读取`Plugins`内的`.mcdr`文件内的`connectcore.plugin.json`来获取入口点信息，并读取其ID，版本号等信息，为与MCDR统一，使用以下格式：
+### 支持的插件载体
+
+独立模式下，插件加载器会扫描 `plugins/` 目录，并接受以下三类插件：
+
+- **目录插件**
+- **`.mcdr` 压缩包插件**
+- **`.pyz` 压缩包插件**
+
+每个插件都必须提供 `connectcore.plugin.json`。
+
+### manifest 示例
 
 ```json
 {
     "id": "example_plugin",
-    "version": "0.0.1",
-    "name": "CliCore",
+    "version": "0.1.0",
+    "name": "Example Plugin",
     "description": {
-        "en_us": "An Example Plugin about ConnectCore",
-        "zh_cn": "ConnectCore的实例插件"
+        "en_us": "Example plugin for ConnectCore",
+        "zh_cn": "ConnectCore 示例插件"
     },
-    "author": "zhongbai233",
-    "link": "https://github.com/zhongbai2333/ExamplePlugin",
-    "dependencies": {},
+    "author": "your_name",
+    "link": "https://github.com/your/repo",
+    "dependencies": {
+        "base_library": ">=1.0,<2.0"
+    },
     "entrypoint": "example_plugin.connectcore.entry",
+    "config_path": "config/example_plugin/config.yml",
+    "config_class": "example_plugin.config.ExampleConfig",
     "archive_name": "ExamplePlugin-v{version}.mcdr",
     "resources": [
         "lang",
@@ -29,155 +63,176 @@
 }
 ```
 
-### `独立模式` 注意事项
+### 必填字段
 
-- **ConnectCore**只接受以`.mcdr`为结尾的压缩包插件，否则无法正常加载。
-- 如果你希望你的插件同时兼容**ConnectCore**的`独立模式`和`MCDR模式`，可以在根目录同时带有`mcdreforged.plugin.json`和`connectcore.plugin.json`文件
-- **请注意**，如果使用`MCDR`模式，插件的加载和卸载是完全由`MCDR`来管理的，因此你需要确保你的插件在`MCDR`下正常工作。且`connectcore.plugin.json`完全不发挥作用，这就代表`MCDR模式`下可以无需`connectcore.plugin.json`文件
-- 详细`MCDR模式`下插件如何工作请看下文的 [MCDR模式](#mcdr模式)
-- 并且我也建议同时带有这两个文件，这样可以使用`python -m mcdreforged pack -o Path`命令来打包你的插件。
-- **请注意**，如果你要使用`MCDReforged`的打包功能，你需要在`mcdreforged.plugin.json`文件中的`resources`配置项中添加以下配置项：
+- `id`: 插件唯一标识
+- `entrypoint`: 插件入口模块路径
+
+### 常用字段
+
+- `version`: 插件版本号
+- `name`: 显示名称
+- `description`: 多语言描述
+- `author`: 作者
+- `link`: 项目链接
+- `dependencies`: 依赖声明
+- `config_path`: 插件默认配置路径
+- `config_class`: 自定义配置类路径，需继承 `BaseConfig`
+- `archive_name`: 打包文件名模板
+- `resources`: 打包时携带的附加资源
+
+### `dependencies` 写法
+
+加载器当前支持以下格式：
+
+#### 字典形式（推荐）
 
 ```json
-"resources": [
-    "lang",
-    "connectcore.plugin.json",
-    "LICENSE"
-]
+{
+    "dependencies": {
+        "base_library": ">=1.0,<2.0",
+        "other_plugin": "*"
+    }
+}
 ```
+
+#### 列表形式
+
+```json
+{
+    "dependencies": [
+        "base_library>=1.0,<2.0",
+        "other_plugin"
+    ]
+}
+```
+
+### 依赖加载规则
+
+- 启动时先扫描所有候选插件
+- 根据依赖关系执行拓扑排序
+- 缺失依赖会阻止插件加载
+- 检测到依赖环时会报错
+- `reload_plugin()` 会联动重载依赖它的插件
+- `unload_plugin()` 默认会级联卸载依赖它的插件
+
+这让插件系统比旧版更像一个“轻量插件包管理器”，不再只是简单地按文件名遍历导入。
+### 独立模式注意事项
+
+1. 独立模式只接受**目录插件**、`.mcdr` 压缩包或 `.pyz` 压缩包。
+2. 如果需要同时支持混合模式，请确保同时提供 `connectcore.plugin.json` 和 `mcdreforged.plugin.json`。
+3. MCDR 模式下**不会**读取 `connectcore.plugin.json` 来加载插件，详见下方 MCDR 模式章节。
+4. 打包插件时可以使用 `python -m mcdreforged pack -o <输出目录>` 命令。
+5. 打包时务必在 `mcdreforged.plugin.json` 的 `resources` 字段中加入 `"connectcore.plugin.json"`，否则混合模式下独立模式侧无法识别该插件。
+---
 
 ## 独立模式入口点
 
- 1. **on_load**
+以下回调由 ConnectCore 的插件加载器自动分发。
 
-    在插件启动时调用，传入控制接口对象。
+### `on_load(control_interface)`
 
-    **Args:**
-    > `control_interface`: 控制接口对象，包含插件的控制方法。
+插件加载时调用。
 
-    ```python
-    def on_load(control_interface):
-        """加载"""
-        global _control_interface
-        _control_interface = control_interface
-        _control_interface.info("Hello World! This is Plugin!!!!!!")
-    ```
+```python
+from connect_core.api import PluginControlInterface
 
- 2. **on_unload**
+_control: PluginControlInterface | None = None
 
-    在插件卸载时调用，无传参。
 
-    ```python
-    def on_unload():
-        """卸载"""
-        _control_interface.info("Bye!")
-    ```
+def on_load(control_interface: PluginControlInterface):
+    global _control
+    _control = control_interface
+    _control.info("Plugin loaded")
+```
 
- 3. **new_connect**
+### `on_unload()`
 
-    在由新的子服务器连接时调用，传入子服务器ID。
+插件卸载时调用。
 
-    **Args:**
-    > `server_list`: 子服务器ID。
+```python
+def on_unload():
+    if _control is not None:
+        _control.info("Plugin unloaded")
+```
 
-    ```python
-    def new_connect(server_id):
-        """有新的连接"""
-        _control_interface.info(server_id)
-    ```
+### `new_connect(server_id: str)`
 
- 4. **del_connect**
+有新的子服务器登录时调用。
 
-    在有子服务器断开连接时调用，传入子服务器ID。
+### `del_connect(server_id: str)`
 
-    **Args:**
-    > `server_list`: 子服务器ID。
+有子服务器断开连接时调用。
 
-    ```python
-    def del_connect(server_id):
-        """有断开连接"""
-        _control_interface.info(server_id)
-    ```
+### `websockets_started()`
 
- 5. **websockets_started**
+WebSocket 已启动（服务端）或已连接成功（客户端）时调用。
 
-    websocket启动/连接成功
-    服务端为启动成功
-    客户端为连接成功
+### `connected()`
 
-    ```python
-    def websockets_started():
-        """
-        websocket启动/连接成功
-        服务端为启动成功
-        客户端为连接成功
-        """
-        _control_interface.info("Websockets Started!")
-    ```
+客户端登录成功后调用。
 
- 6. **connected**
+### `disconnected()`
 
-    子服务器与主服务器连接成功时调用，无传参
+客户端与服务端断开后调用。
 
-    ```python
-    def connected():
-        """连接成功"""
-        _control_interface.info("Connected!")
-    ```
+### `recv_data(from_server_id: str, data: dict)`
 
- 7. **disconnected**
+插件收到发往自己插件 ID 的数据时调用。
 
-    子服务器与主服务器断开连接时调用，无传参
+> 与旧文档相比，这个回调在当前实现里**不会**再把目标插件 ID 作为参数传入，因为插件分发已经在加载器层完成了。
 
-    ```python
-    def disconnected():
-        """断开连接"""
-        _control_interface.info("Disconnected!")
-    ```
+### `recv_file(from_server_id: str, file_path: str)`
 
- 8. **recv_data**
+插件收到发往自己插件 ID 的文件时调用。
 
-    接收子服务器发送的数据包时调用，传入子服务器ID和数据包。
+---
 
-    **Args:**
-    > `server_id`: 子服务器的ID。
-    > `data`: 数据包。
+## 独立模式目录建议
 
-    ```python
-    def recv_data(server_id: str, data: dict):
-        """收到数据包"""
-        _control_interface.info(data)
-    ```
+### 目录插件示例
 
- 9. **recv_file**
+```text
+example_plugin/
+├─ connectcore.plugin.json
+├─ LICENSE
+├─ lang/
+│  ├─ en_us.yml
+│  └─ zh_cn.yml
+├─ example_plugin/
+│  ├─ __init__.py
+│  ├─ connectcore/
+│  │  └─ entry.py
+│  └─ config.py
+```
 
-    接收子服务器发送的文件时调用，传入子服务器ID和文件保存路径。
+### 推荐做法
 
-    **Args:**
-    > `server_id`: 子服务器的ID。
-    > `file`: 文件保存路径。
+- 入口点模块尽量保持轻量，只做初始化
+- 配置类单独放到 `config.py`
+- 语言文件放在 `lang/`
+- 发送文件时自己保证路径可读且目标路径合理
+- 使用 `BaseConfig` 而不是手写 YAML/JSON 解析
 
-    ```python
-    def recv_file(server_id: str, file: str):
-        """收到文件"""
-        _control_interface.info(file)
-    ```
+---
 
-## MCDR模式
+## MCDR 模式
 
-`MCDR`模式下，**ConnectCore**插件是作为前置插件来工作的，所以无需`connectcore.plugin.json`，且`PluginControlInterface`是通过**ConnectCore**的API获取的，而不是通过`on_load`函数来传参
+MCDR 模式下，ConnectCore 作为前置插件运行。第三方插件应由 MCDR 自己加载，并在需要时获取 `PluginControlInterface`。
+
+### `mcdreforged.plugin.json` 示例
 
 ```json
 {
     "id": "example_plugin",
-    "version": "0.0.1",
-    "name": "CliCore",
+    "version": "0.1.0",
+    "name": "Example Plugin",
     "description": {
-        "en_us": "An Example Plugin about ConnectCore",
-        "zh_cn": "ConnectCore的实例插件"
+        "en_us": "Example plugin for ConnectCore",
+        "zh_cn": "ConnectCore 示例插件"
     },
-    "author": "zhongbai233",
-    "link": "https://github.com/zhongbai2333/ExamplePlugin",
+    "author": "your_name",
+    "link": "https://github.com/your/repo",
     "dependencies": {
         "connect_core": "*"
     },
@@ -191,151 +246,100 @@
 }
 ```
 
-### `MCDR模式` 注意事项
+### 获取控制接口
 
-- 请注意要在`dependencies`内添加**ConnectCore**以确保不会出现加载错误
-- `MCDR模式`下，**ConnectCore**和**你的插件**本质上是两个独立的插件，只是有依赖关系，所以你可以在开发完成后将其上传至`MCDR`的`插件列表收集仓库`
+```python
+from mcdreforged.api.all import *
+from connect_core.api import get_plugin_control_interface
 
-## MCDR模式入口点
+_control = None
 
- 1. 获取插件控制接口
 
-    `mcdr模式`下，你可以通过`get_plugin_control_interface`获取插件控制接口，然后通过这个接口来调用**ConnectCore**的方法
+def on_load(server: PluginServerInterface, _):
+    global _control
+    _control = get_plugin_control_interface(
+        "example_plugin",
+        "example_plugin.mcdr.entry",
+        server,
+    )
+    if _control is not None:
+        _control.info("ConnectCore interface ready")
+```
 
-    **请注意**，在`mcdr模式`下，`PluginControlInterface`中的`info`、`warn`、`error`、`debug`实际调用的是你的插件下的`PluginServerInterface.logger.info`、`warn`、`error`、`debug`，所以你无需在`混合模式`下考虑是否需要同时支持`_control_interface.info`和`PluginServerInterface.logger.info`，他们是通用的
+> ℹ️ 传入的 `entrypoint` 参数是你插件的**独立模式**入口点，并非 MCDR 的入口点。即使两边使用了同名的函数也不会发生覆盖或冲突。
 
-    `get_plugin_control_interface`需要传入参数：
+### MCDR 模式注意事项
 
-    **Args:**
-    >sid (str): 服务器ID
-    >enter_point (str): 入口点
-    >mcdr (PluginServerInterface): MCDR接口
+1. `mcdreforged.plugin.json` 的 `dependencies` 中**必须**添加 `"connect_core": "*"`（或指定版本范围），确保 ConnectCore 先于你的插件加载。
+2. MCDR 模式下，你的插件和 ConnectCore 是两个独立的 MCDR 插件，满足 MCDR 贡献标准后可上传至[插件列表收集仓库](https://github.com/MCDReforged/PluginCatalogue)。
 
-    **Returns:**
-    >PluginControlInterface: 插件控制接口
+### 当前实现与旧版的差异
 
-    ```python
-    def get_plugin_control_interface(
-        sid: str, enter_point: str, mcdr: PluginServerInterface
-    ) -> PluginControlInterface:
-        """
-        获取插件控制接口
+在当前 PRC 版本中：
 
-        Args:
-            sid (str): 插件ID
-            enter_point (str): 入口点
-            mcdr (PluginServerInterface): MCDR接口
-        Returns:
-            PluginControlInterface: 插件控制接口
-        """
-    ```
+- ConnectCore 在 `MCDR` 模式下**不会启用独立插件加载器**
+- `connectcore.plugin.json` 不会用于自动加载 MCDR 插件
+- `get_plugin_control_interface()` 主要作用是返回一个可发送数据 / 文件、可读取配置与日志的接口对象
+- 第三方 MCDR 插件的生命周期仍由 MCDR 本身管理
 
-    **请注意**，传入的入口点是你写的插件的入口点，而不是MCDR的入口点，只是在`MCDR模式`下**ConnectCore**不会去读取`on_load`和`on_unload`，所以入口点函数和`MCDR`的入口点函数是不同的，写一摸一样的一个不会发生冲突。
+因此，旧文档中“后续回调与独立模式相同”的说法，在 PRC 当前实现里**不再适合作为保证**。
+> ℹ️ 在 MCDR 模式下，`PluginControlInterface` 中的 `info`、`warn`、`error`、`debug` 实际调用的是你插件的 `PluginServerInterface.logger` 对应方法。因此在混合模式下无需同时适配 `_control.info` 和 `PluginServerInterface.logger.info`——它们是统一的。
+---
 
-    ```python
-    from mcdreforged.api.all import *
-    from connect_core.api.mcdr import get_plugin_control_interface
+## 混合模式建议
 
-    # MCDR Start point
-    def on_load(server: PluginServerInterface,_):
-        global __mcdr_server,_control_interface
-        __mcdr_server = server
-        _control_interface = get_plugin_control_interface(
-            "example_plugin", 
-            "example_plugin.mcdr.entry", 
-            server)
+如果你希望一个插件同时支持 ConnectCore 独立模式与 MCDR 模式，建议：
 
-        _control_interface.info("Hello")
-    ```
+- 同时保留 `connectcore.plugin.json` 与 `mcdreforged.plugin.json`
+- 将公共逻辑抽到共享模块
+- 分别提供：
+  - `example_plugin.connectcore.entry`
+  - `example_plugin.mcdr.entry`
+- 避免在两个入口点中复制业务逻辑
 
-### 接下来的入口点与`独立模式`相同
+---
 
- 1. **new_connect**
+## 配置类
 
-    在由新的子服务器连接时调用，传入子服务器列表。
+如果 manifest 中指定了 `config_class`，ConnectCore 会尝试动态导入该类，并要求它继承 `BaseConfig`。
 
-    **Args:**
-    > `server_list`: 子服务器列表，包含子服务器的ID。
+```python
+from connect_core.api import BaseConfig, Field
 
-    ```python
-    def new_connect(server_list):
-        """有新的连接"""
-        _control_interface.info(server_list)
-    ```
+class ExampleConfig(BaseConfig):
+    __config_path__ = "config/example_plugin/config.yml"
 
- 2. **del_connect**
+    enabled: bool = Field(True, "是否启用")
+    channel: str = Field("default", "频道名")
+```
 
-    在有子服务器断开连接时调用，传入子服务器列表。
+如果没有指定 `config_class`，加载器会自动生成一个默认配置类，并使用：
 
-    **Args:**
-    > `server_list`: 子服务器列表，包含子服务器的ID。
+- manifest 中的 `config_path`
+- 或默认路径 `config/<plugin_id>/config.yml`
 
-    ```python
-    def del_connect(server_list):
-        """有断开连接"""
-        _control_interface.info(server_list)
-    ```
+---
 
- 3. **connected**
+## 卸载与重载行为
 
-    子服务器与主服务器连接成功时调用，无传参
+PRC 新版插件系统在卸载时会做更多清理工作：
 
-    ```python
-    def connected():
-        """连接成功"""
-        _control_interface.info("Connected!")
-    ```
+- 调用插件的 `on_unload()`
+- 移除导入模块
+- 释放 `sys.path` 注入项
+- 清理该插件注册的命令与补全词典
+- 更新依赖关系图
 
- 4. **disconnected**
+这比旧版实现更安全，能减少“插件卸载了但命令还挂着”的残留问题。
 
-    子服务器与主服务器断开连接时调用，无传参
+---
 
-    ```python
-    def disconnected():
-        """断开连接"""
-        _control_interface.info("Disconnected!")
-    ```
+## 最佳实践
 
- 5. **websockets_started**
-
-    websocket启动/连接成功
-    服务端为启动成功
-    客户端为连接成功
-
-    ```python
-    def websockets_started():
-        """
-        websocket启动/连接成功
-        服务端为启动成功
-        客户端为连接成功
-        """
-        _control_interface.info("Websockets Started!")
-    ```
-
- 6. **recv_data**
-
-    接收子服务器发送的数据包时调用，传入子服务器ID和数据包。
-
-    **Args:**
-    > `server_id`: 子服务器的ID。
-    > `data`: 数据包。
-
-    ```python
-    def recv_data(server_id: str, data: dict):
-        """收到数据包"""
-        _control_interface.info(data)
-    ```
-
- 7. **recv_file**
-
-    接收子服务器发送的文件时调用，传入子服务器ID和文件保存路径。
-
-    **Args:**
-    > `server_id`: 子服务器的ID。
-    > `file`: 文件保存路径。
-
-    ```python
-    def recv_file(server_id: str, file: str):
-        """收到文件"""
-        _control_interface.info(file)
-    ```
+- 所有插件对外能力统一通过 `connect_core.api` 导入
+- 不要依赖 `connect_core` 内部私有模块路径
+- `id` 一旦发布就尽量不要改
+- 依赖约束尽量写清楚版本范围
+- 自定义配置请使用 `BaseConfig`
+- 网络通信请使用 `PluginControlInterface.send_data()` / `send_file()`
+- 需要扩展协议时，优先使用 `status_registry` 注册自定义状态，而不是硬改内置协议

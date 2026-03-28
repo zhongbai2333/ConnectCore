@@ -1,161 +1,105 @@
-import os
-import re
 import sys
-import time
-import json
-import websockets
-import asyncio
-from connect_core.storage import YmlLanguage, JsonDataEditor
-from connect_core.account.login_system import analyze_password
-from connect_core.cli.cli_core import Server, Client
-from connect_core.tools import restart_program
-from connect_core.websocket.data_packet import DataPacket
+from time import sleep
+from typing import Optional
 
-_is_server = False
+from prompt_toolkit.patch_stdout import patch_stdout
+
+from connect_core.context import GlobalContext
+from connect_core.interface.control_interface import CoreControlInterface
+from connect_core.init_config import CliInitConfig
+from connect_core.tools.self_read import get_version
+from connect_core.account.register_system import register_system_main
+from connect_core.aes_encrypt import aes_main
+from connect_core.plugin.init_plugin import init_plugin_main
+from connect_core.websockets.server import (
+    websocket_server_main,
+    websocket_server_stop,
+)
+from connect_core.websockets.client import (
+    websocket_client_main,
+    websocket_client_stop,
+)
+from connect_core.cli.command_core import CommandLineInterface
+from connect_core.cli.commands import ClientCommand, ServerCommand
+from connect_core.cli.debug_tools import (
+    MainThreadLogTester,
+    register_debug_commands,
+)
+from typing import Callable, Any
+
+cli = None  # type: Optional[CommandLineInterface]
 
 
-# Function
-async def check_websocket(server_uri) -> bool:
-    """
-    检查websocket服务器是否在线
-    """
+def core_entry() -> None:
+    global cli
+    CliInitConfig()
+    _control_interface = CoreControlInterface()
+    aes_password = getattr(_control_interface.config, "password", None)
+    if isinstance(aes_password, str) and aes_password:
+        aes_main(_control_interface, aes_password)
+    else:
+        aes_main(_control_interface)
+    cli = CommandLineInterface(_control_interface)
+    _control_interface.command_control.bind_cli(cli)
+    log_tester: Optional[MainThreadLogTester] = None
+    stop_websocket: Callable[[], Any] | None = None
+
+    if _control_interface.is_server:
+        ServerCommand(_control_interface)
+        register_system_main(_control_interface)
+        stop_websocket = websocket_server_stop
+    else:
+        ClientCommand(_control_interface)
+        stop_websocket = websocket_client_stop
+
+    init_plugin_main(_control_interface)
+
+    if _control_interface.is_server:
+        websocket_server_main(_control_interface)  # pyright: ignore[reportCallIssue]
+    else:
+        websocket_client_main(_control_interface)  # pyright: ignore[reportCallIssue]
+
+    if GlobalContext.is_debug_mode():
+        log_tester = register_debug_commands(_control_interface)
+    _control_interface.command_control.flush_cli()
+    original_console_stream = _control_interface.log_system.get_console_stream()
     try:
-        async with websockets.connect(server_uri) as websocket:
-            print(f"Connected to {server_uri} successfully!")
-            data_packet = DataPacket()
-            # 可以发送和接收消息以进一步测试
-            await websocket.send(
-                json.dumps(
-                    data_packet.get_data_packet(
-                        data_packet.TYPE_TEST_CONNECT,
-                        data_packet.DEFAULT_TO_FROM,
-                        data_packet.DEFAULT_TO_FROM,
-                        None,
-                    )["-----"]
+        with patch_stdout(raw=True):
+            _control_interface.log_system.set_console_stream(sys.stdout)
+            cli_thread = cli.start()  # pyright: ignore[reportCallIssue]
+            _control_interface.logger.info(
+                _control_interface.translate("cli.starting.welcome", get_version())
+            )
+            if _control_interface.is_server:
+                _control_interface.logger.info(
+                    _control_interface.translate("cli.starting.get_password")
                 )
-            )
-            response = await websocket.recv()
-            if json.loads(response)["type"] == list(data_packet.TYPE_TEST_CONNECT):
-                return True
-            return False
-    except Exception as e:
-        print(f"Failed to connect to {server_uri}: {e}")
-        return False
-
-
-def _initialization_config() -> None:
-    """
-    第一次启动时的配置初始化过程。
-    收集用户输入的信息并生成初始配置字典。
-    """
-
-    # 选择语言
-    lang = input("Choose language | 请选择语言: [EN_US/zh_cn] ")
-    lang = lang if lang else "en_us"
-    lang.lower()
-
-    translate_temp = YmlLanguage(sys.argv[0], lang).translate
-
-    if _is_server:
-        # 输入IP地址
-        ip = input(
-            translate_temp["connect_core"]["cli"]["initialization_config"]["enter_ip"]
-        )
-        while not re.match(r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", ip):
-            if not ip:
-                break
-            print(translate_temp["connect_core"]["cli"]["initialization_config"]["invalid_ip"])
-            ip = input(
-                translate_temp["connect_core"]["cli"]["initialization_config"][
-                    "enter_ip"
-                ]
-            )
-        ip = ip if ip else "127.0.0.1"
-
-        # 输入端口
-        port = input(
-            translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
-        )
-        while not (0 <= int(port) <= 65535):
-            if not port:
-                break
-            print(translate_temp["connect_core"]["cli"]["initialization_config"]["invalid_port"])
-            port = input(
-                translate_temp["connect_core"]["cli"]["initialization_config"]["enter_port"]
-            )
-        port = int(port) if port else 23233
-
-        print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])
-
-        JsonDataEditor("config.json").write(
-            {
-                "language": lang,
-                "ip": ip,
-                "port": port,
-                "debug": False,
-            }
-        )
-        time.sleep(3)
-    else:
-        key = input(
-            translate_temp["connect_core"]["cli"]["initialization_config"]["enter_key"]
-        )
-        data = analyze_password(key)
-        ip_list = [list(data["ip"].values())[0]]
-        for i in list(data["ip"].values())[1]:
-            ip_list.append(i)
-        ip_list.append(list(data["ip"].values())[-1])
-        for ip in ip_list:
-            url = f"ws://{ip}:{data['port']}"
-            if asyncio.run(check_websocket(url)):
-                last_ip = ip
-                break
+            try:
+                while cli_thread is not None and cli_thread.is_alive():
+                    if log_tester is not None:
+                        log_tester.maybe_log()
+                    if not cli.running:
+                        break
+                    sleep(0.05)
+            except KeyboardInterrupt:
+                cli.running = False
+            finally:
+                if log_tester is not None:
+                    log_tester.shutdown()
+                if cli_thread is not None and cli_thread.is_alive():
+                    cli.running = False
+                    try:
+                        cli.session.app.exit()
+                    except Exception:
+                        pass
+                    cli_thread.join(timeout=1)
+    finally:
+        if stop_websocket is not None:
+            try:
+                stop_websocket()
+            except Exception:
+                pass
+        if original_console_stream is not None:
+            _control_interface.log_system.set_console_stream(original_console_stream)
         else:
-            print(f"Error: Can't Visit Server! {ip_list}")
-            ip = input("Please enter the correct IP address: ")
-            url = f"ws://{ip}:{data['port']}"
-            if not asyncio.run(check_websocket(url)):
-                print(f"Error: Can't Visit Server! {ip}, please check the IP address.")
-                return
-
-        print(translate_temp["connect_core"]["cli"]["initialization_config"]["finish"])
-
-        JsonDataEditor("config.json").write(
-            {
-                "language": lang,
-                "ip": last_ip,
-                "port": data["port"],
-                "account": "-----",
-                "password": data["password"],
-                "debug": False,
-            }
-        )
-        time.sleep(3)
-
-
-# Public
-def core_entry_init(is_server: bool) -> None:
-    """
-    核心程序主程序
-    """
-    global _is_server
-    _is_server = is_server
-    # 初始化
-    if not os.path.exists("config.json"):
-        _initialization_config()
-        restart_program()
-    # 获取控制接口
-    if is_server:
-        server = Server()
-        server.start_servers()
-    else:
-        client = Client()
-        client.start_server()
-
-def get_is_server() -> bool:
-    """
-    获取服务器还是客户端
-
-    :return: 布尔值
-    """
-    return _is_server
+            _control_interface.log_system.restore_console_stream()

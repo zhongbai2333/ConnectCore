@@ -1,121 +1,260 @@
+from __future__ import annotations
+
 import re
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
+
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.patch_stdout import patch_stdout
-from connect_core.tools import new_thread
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from connect_core.api.interface import CoreControlInterface
+from connect_core.tools.tools import new_thread
+from connect_core.cli.arguments import (
+    ArgumentFactory,
+    ArgumentSpec,
+    ArgumentType,
+    CommandSyntaxError,
+    GreedyTextArgument,
+    IntegerArgument,
+    TextArgument,
+)
+
+if TYPE_CHECKING:  # pragma: no cover
+    from connect_core.interface.control_interface import CoreControlInterface
 
 
-# 命令行界面类
+CompleterTemplate = Dict[str, object]
+_PLACEHOLDER_PATTERN = re.compile(r"<([^<>]+)>")
+
+
+@dataclass
+class CommandBinding:
+    callback: Callable[..., None]
+    placeholder_names: List[str]
+    argument_specs: List[ArgumentSpec]
+    pass_context: bool
+    legacy: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.legacy and len(self.argument_specs) != len(self.placeholder_names):
+            raise ValueError(
+                "参数定义数量与占位符不匹配: " + ", ".join(self.placeholder_names)
+            )
+
+    def build_arguments(
+        self, params: List[str]
+    ) -> Tuple[List[object], Dict[str, object]]:
+        if self.legacy or not self.argument_specs:
+            return list(params), {}
+
+        values: List[object] = []
+        context: Dict[str, object] = {}
+        index = 0
+
+        for spec in self.argument_specs:
+            value, index = spec.parse(params, index)
+            values.append(value)
+            context[spec.name] = value
+
+        if index < len(params):
+            extra = " ".join(params[index:])
+            raise CommandSyntaxError(f"存在多余参数: {extra}")
+
+        return values, context if self.pass_context else {}
+
+
 class CommandLineInterface:
+    """轻量命令行调度器，支持嵌套命令与动态补全。"""
 
-    def __init__(self, interface: "CoreControlInterface", prompt: str = ">>> "):
-        """
-        初始化命令行界面类，设置默认提示符和补全器。
-
-        Args:
-            connect_interface (CoreControlInterface): API接口
-        """
+    def __init__(self, interface: "CoreControlInterface", prompt: str = ">>> ") -> None:
         self.prompt = prompt
-        self.completer = {}
-        self.commands = {}
-        self.session = PromptSession(
+        self.completer: Dict[str, CompleterTemplate] = {}
+        self.commands: Dict[str, Dict[str, object]] = {}
+        self._completer_templates: Dict[str, CompleterTemplate] = {}
+        self._dynamic_lists: Dict[str, Callable[[], Iterable[str]]] = {}
+        self.session: PromptSession[str] = PromptSession(
             completer=NestedCompleter.from_nested_dict(self.completer)
         )
         self.running = True
         self.interface = interface
 
-    def set_prompt(self, prompt):
-        """
-        设置提示符文本。
-
-        Args:
-            prompt (str): 新的提示符文本。
-        """
+    def set_prompt(self, prompt: str) -> None:
         self.prompt = prompt
 
-    def set_completer_words(self, sid, words):
-        """
-        设置补全器的单词列表。
+    def register_dynamic_list(
+        self, placeholder: str, resolver: Callable[[], Iterable[str]]
+    ) -> None:
+        key = placeholder.strip("[]")
+        self._dynamic_lists[key] = resolver
 
-        Args:
-            sid (int): 插件的标识符。
-            words (dict): 新的补全单词列表。
-        """
-        self.completer.setdefault(sid, {}).update(words)
+    def set_completer_words(self, sid: str, words: CompleterTemplate) -> None:
+        self._completer_templates[sid] = deepcopy(words)
+        self.completer[sid] = self._expand_template(words)  # type: ignore[assignment]
 
-    def add_command(self, sid, command, action):
-        """
-        注册一个新的命令。
+    def add_command(
+        self,
+        sid: str,
+        command: str,
+        action: Callable[..., None],
+        *,
+        argument_specs: Optional[List[ArgumentSpec]] = None,
+        pass_context: bool = False,
+    ) -> None:
+        segments = command.split()
+        if not segments:
+            return
 
-        Args:
-            sid (int): 插件的标识符。
-            command (str): 命令的名称。
-            action (callable): 执行该命令的函数。
-        """
-        commands = command.split()
+        placeholder_names: List[str] = []
+        node: dict[str, object] = self.commands.setdefault(sid, {})  # type: ignore[assignment]
+        for segment in segments[:-1]:
+            if self._is_placeholder(segment):
+                placeholder_names.append(self._strip_placeholder(segment))
+            node = node.setdefault(segment, {})  # type: ignore[assignment]
 
-        # 确保 sid 存在，并初始化为空字典
+        last_segment = segments[-1]
+        if self._is_placeholder(last_segment):
+            placeholder_names.append(self._strip_placeholder(last_segment))
+
+        if argument_specs:
+            defined_names = [spec.name for spec in argument_specs]
+            if defined_names != placeholder_names:
+                raise ValueError(
+                    f"命令 '{command}' 的参数定义顺序不匹配: {defined_names} vs {placeholder_names}"
+                )
+
+        specs = argument_specs or []
+        binding = CommandBinding(
+            callback=action,
+            placeholder_names=placeholder_names,
+            argument_specs=specs,
+            pass_context=pass_context,
+            legacy=argument_specs is None,
+        )
+        node[last_segment] = binding
+
+    def remove_command(self, sid: str, command: str) -> None:
         if sid not in self.commands:
-            self.commands[sid] = {}
+            return
 
-        cmd_dict = self.commands[sid]  # 先取得命令字典
+        segments = command.split()
+        if not segments:
+            return
 
-        # 遍历命令路径中的每一部分，逐级进入字典
-        for key in commands[:-1]:  # 遍历到倒数第二个元素，创建或找到路径
-            if key not in cmd_dict:
-                cmd_dict[key] = {}  # 如果没有这个键，创建一个新的空字典
-            cmd_dict = cmd_dict[key]  # 进入下一层级
+        stack = [self.commands[sid]]
+        for segment in segments[:-1]:
+            current = stack[-1]
+            next_node = current.get(segment)
+            if not isinstance(next_node, dict):
+                return
+            stack.append(next_node)
 
-        # 对于最后一个元素，赋予值
-        cmd_dict[commands[-1]] = action
+        stack[-1].pop(segments[-1], None)
 
-    def remove_command(self, sid, command):
-        """
-        移除一个已注册的命令。
+        for depth in range(len(stack) - 1, 0, -1):
+            parent = stack[depth - 1]
+            key = segments[depth - 1]
+            child = parent.get(key)
+            if isinstance(child, dict) and not child:
+                parent.pop(key, None)
 
-        Args:
-            sid (int): 插件的标识符。
-            command (str): 要移除的命令名称。
-        """
-        if sid in self.commands.keys():
-            commands = command.split()
-            for key in commands[:-1]:  # 遍历路径，找到倒数第二个键
-                if key in self.commands[sid]:
-                    self.commands[sid] = self.commands[sid][key]  # 进入下一层级
-                else:
-                    return  # 如果路径不存在，直接返回，不做任何修改
+    def remove_sid(self, sid: str) -> None:
+        self.commands.pop(sid, None)
+        self.completer.pop(sid, None)
+        self._completer_templates.pop(sid, None)
 
-            # 删除最后一个键
-            if commands[-1] in self.commands[sid]:
-                del self.commands[sid][commands[-1]]
-
-            # 删除空字典键（如果有）
-            for key in list(self.commands[sid].keys()):
-                if (
-                    isinstance(self.commands[sid][key], dict)
-                    and not self.commands[sid][key]
-                ):
-                    del self.commands[sid][key]
-
-    def flush_cli(self):
-        """
-        刷新命令系统
-        """
+    def flush_cli(self) -> None:
+        for sid, template in self._completer_templates.items():
+            self.completer[sid] = self._expand_template(template)  # type: ignore[assignment]
         self.session.app.current_buffer.completer = NestedCompleter.from_nested_dict(
             self.completer
         )
         self.session.app.invalidate()
 
-    def input_loop(self):
-        """
-        开始输入循环，处理用户输入。
+    def _expand_template(self, template: object) -> object:
+        if not isinstance(template, dict):
+            return template
 
-        捕获KeyboardInterrupt和EOFError以安全地停止循环。
-        """
+        expanded: Dict[str, object] = {}
+        for key, value in template.items():
+            if isinstance(key, str) and key.startswith("[") and key.endswith("]"):
+                placeholder = key.strip("[]")
+                resolver = self._dynamic_lists.get(placeholder)
+                try:
+                    generated = list(resolver()) if resolver else []
+                except Exception as exc:  # pragma: no cover - defensive log
+                    self.interface.logger.debug(
+                        f"Failed to resolve completer placeholder '{placeholder}': {exc}"
+                    )
+                    generated = []
+
+                for item in generated:
+                    expanded[str(item)] = self._expand_template(deepcopy(value))
+            else:
+                expanded[key] = self._expand_template(value)
+        return expanded
+
+    def _resolve_command_path(
+        self, command_tree: Dict[str, object], params: Iterable[str]
+    ) -> Tuple[Optional[CommandBinding], List[str]]:
+        node: object = command_tree
+        captured: List[str] = []
+        tokens = list(params)
+
+        for index, token in enumerate(tokens):
+            if isinstance(node, CommandBinding):
+                captured.extend(tokens[index:])
+                return node, captured
+
+            if not isinstance(node, dict):
+                break
+
+            if token in node:
+                node = node[token]
+                continue
+
+            placeholder_key = self._match_placeholder(node)
+            if placeholder_key is None:
+                command_text = " ".join(tokens[: index + 1])
+                self.interface.logger.warning(
+                    self.interface.translate(
+                        "cli.command_core.unknown_command", command_text
+                    )
+                )
+                return None, []
+
+            captured.append(token)
+            node = node[placeholder_key]
+
+        if isinstance(node, dict):
+            placeholder_key = self._match_placeholder(node)
+            if placeholder_key is not None:
+                name = self._strip_placeholder(placeholder_key)
+                self.interface.logger.warning(f"缺少参数 <{name}>")
+                return None, []
+            return None, []
+
+        if isinstance(node, CommandBinding):
+            return node, captured
+
+        return None, []
+
+    @staticmethod
+    def _match_placeholder(command_dict: Dict[str, object]) -> Optional[str]:
+        for key in command_dict.keys():
+            if isinstance(key, str) and key.startswith("<") and key.endswith(">"):
+                return key
+        return None
+
+    @staticmethod
+    def _is_placeholder(segment: str) -> bool:
+        return segment.startswith("<") and segment.endswith(">")
+
+    @staticmethod
+    def _strip_placeholder(segment: str) -> str:
+        return segment.strip("<>")
+
+    def input_loop(self) -> None:
         while self.running:
             try:
                 with patch_stdout():
@@ -125,63 +264,130 @@ class CommandLineInterface:
                     )
                     self.handle_input(text)
             except (KeyboardInterrupt, EOFError):
-                self.running = False
-                self.interface.info("正在退出...")
+                self._handle_exit()
 
-    def handle_input(self, text):
-        """
-        处理用户输入的命令并执行相应的操作。
+    def handle_input(self, text: str) -> None:
+        if not text:
+            return
 
-        Args:
-            text (str): 用户输入的文本。
-        """
-        if text:
-            commands = text.split()
-            sid = commands[0]  # 这里将第一个元素作为sid
-            params = commands[1:]  # 剩余的部分作为命令路径
+        normalized = text.strip().lower()
+        if normalized in {"exit", "quit"}:
+            self._handle_exit()
+            return
 
-            # 检查是否存在该 sid 的命令字典
-            if sid not in self.commands:
-                self.interface.warn(f"未知插件ID: {sid}")
-                return None
+        parts = text.split()
+        if not parts:
+            return
 
-            # 如果只输入了sid，没有其他命令，默认执行 sid help
-            if not params:
-                params = ["help"]
+        sid, *params = parts
 
-            cmd_dict = self.commands[sid]
-            command = cmd_dict
-            final_params = []
+        if sid not in self.commands:
+            self.interface.logger.warning(
+                self.interface.translate("cli.command_core.unknown_plugin", sid)
+            )
+            return
 
-            # 遍历命令路径并执行对应操作
-            for key in params:
-                # 如果命令存在并且当前路径是字典
-                if isinstance(command, dict) and key in command:
-                    command = command[key]
-                # 如果遇到占位符，进行替换并提取参数
-                elif isinstance(command, dict):
-                    # 查找命令中带占位符的键
-                    for cmd_key in command.keys():
-                        match = re.match(r"<([^>]+)>", cmd_key)  # 匹配占位符
-                        if match:
-                            # 如果占位符匹配，则将用户输入的参数替换占位符
-                            final_params.append(key)  # 用实际值替换占位符
-                            command = command[cmd_key]  # 进入下一层字典
-                            break
-                else:
-                    self.interface.warn(f"未知命令: {key}")
-                    return None  # 如果路径不存在或某层不是字典，则返回 None
+        if not params:
+            params = ["help"]
 
-            # 执行命令，并传入提取到的参数
-            if callable(command):
-                command(*final_params)  # 传递提取的参数
-            else:
-                self.interface.warn(f"无法执行命令: {command}")
-                return None
+        command, captured = self._resolve_command_path(self.commands[sid], params)
+        if command is None:
+            return
+
+        if command.legacy:
+            command.callback(*captured)
+            return
+
+        try:
+            args, context = command.build_arguments(captured)
+        except CommandSyntaxError as exc:
+            self.interface.logger.warning(str(exc))
+            return
+
+        if context:
+            command.callback(*args, context=context)
+        else:
+            command.callback(*args)
 
     @new_thread("CommandCore")
-    def start(self):
-        """
-        启动命令行界面，开启输入循环。
-        """
+    def start(self) -> None:
         self.input_loop()
+
+    def _handle_exit(self) -> None:
+        if not self.running:
+            return
+        self.running = False
+        self.interface.logger.info(self.interface.translate("cli.command_core.exiting"))
+        try:
+            self.session.app.exit()
+        except Exception:  # pragma: no cover - best effort
+            pass
+
+
+class SimpleCommandBuilder:
+    """简易命令构建器，提供声明式命令注册接口。"""
+
+    def __init__(self) -> None:
+        self._commands: List[Tuple[str, Callable[..., None], bool]] = []
+        self._argument_factories: Dict[str, ArgumentFactory] = {}
+
+    def command(
+        self,
+        definition: str,
+        handler: Callable[..., None],
+        *,
+        pass_context: bool = False,
+    ) -> "SimpleCommandBuilder":
+        definition = definition.strip()
+        if not definition:
+            raise ValueError("命令定义不能为空")
+        self._commands.append((definition, handler, pass_context))
+        return self
+
+    def arg(self, name: str, argument: ArgumentFactory) -> "SimpleCommandBuilder":
+        name = name.strip()
+        if not name:
+            raise ValueError("参数名称不能为空")
+        self._argument_factories[name] = argument
+        return self
+
+    def register(self, command_control: "CoreControlInterface.CommandControl") -> None:
+        for definition, handler, pass_context in self._commands:
+            placeholders = _PLACEHOLDER_PATTERN.findall(definition)
+            specs: List[ArgumentSpec] = []
+            for placeholder in placeholders:
+                parser = self._create_argument_parser(placeholder)
+                specs.append(ArgumentSpec(placeholder, parser))
+
+            command_control.add_command(
+                definition,
+                handler,
+                argument_specs=specs if specs else None,
+                pass_context=pass_context,
+            )
+
+    def _create_argument_parser(self, name: str) -> ArgumentType:
+        factory = self._argument_factories.get(name)
+        if factory is None:
+            return TextArgument()
+
+        if isinstance(factory, ArgumentType):
+            return deepcopy(factory)
+
+        if isinstance(factory, type) and issubclass(factory, ArgumentType):
+            return factory()
+
+        if callable(factory):
+            parser = factory()
+            if not isinstance(parser, ArgumentType):
+                raise TypeError(f"参数工厂返回了不是 ArgumentType 的对象: {name}")
+            return parser
+
+        raise TypeError(f"无法解析参数工厂: {name}")
+
+
+__all__ = [
+    "CommandLineInterface",
+    "CommandBinding",
+    "SimpleCommandBuilder",
+]

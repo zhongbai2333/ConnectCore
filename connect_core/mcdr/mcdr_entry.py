@@ -1,99 +1,120 @@
 import time
-from mcdreforged.api.all import *
+from pathlib import Path
+from typing import Any, Optional, TYPE_CHECKING
+
+import yaml  # type: ignore[import-untyped]
+from mcdreforged.api.all import PluginServerInterface
+
+from connect_core.context import GlobalContext
+from connect_core.aes_encrypt import aes_main
+from connect_core.account.register_system import register_system_main
 from connect_core.interface.control_interface import (
     CoreControlInterface,
     PluginControlInterface,
 )
-from connect_core.mcdr.commands import CommandActions
-from connect_core.websocket.server import websocket_server_main, websocket_server_stop
-from connect_core.websocket.client import websocket_client_main, websocket_client_stop
-from connect_core.plugin.init_plugin import init_plugin_main, mcdr_add_entry_point
-from connect_core.account.register_system import register_system_main
-from connect_core.aes_encrypt import aes_main
+from connect_core.plugin.init_plugin import init_plugin_main
+from connect_core.websockets.server import websocket_server_main, websocket_server_stop
+from connect_core.websockets.client import websocket_client_main, websocket_client_stop
 
-__mcdr_server, _control_interface = None, None
+if TYPE_CHECKING:
+    from connect_core.mcdr.commands import CommandActions
+
+__mcdr_server: Optional[PluginServerInterface] = None
+_control_interface: Optional[CoreControlInterface] = None
 
 
-def get_mcdr() -> PluginServerInterface | None:
-    """
-    获取MCDR
-
-    Returns:
-        PluginServerInterface | None: MCDR状态
-    """
+def get_mcdr() -> Optional[PluginServerInterface]:
     return __mcdr_server
 
 
-def get_plugin_control_interface(
-    sid: str, enter_point: str, mcdr: PluginServerInterface
-) -> PluginControlInterface:
-    """
-    获取插件控制接口
+def _detect_server_mode(config_path: Path) -> bool:
+    """通过读取配置文件判断是否为服务端模式。
 
-    Args:
-        sid (str): 插件ID
-        enter_point (str): 入口点
-        mcdr (PluginServerInterface): MCDR接口
-    Returns:
-        PluginControlInterface: 插件控制接口
+    如果配置文件不存在或缺少客户端特有字段（account/password），则视为服务端。
     """
+    if not config_path.exists():
+        return True
     try:
-        if mcdr_add_entry_point(sid, enter_point):
-            return PluginControlInterface(sid, None, f"./config/{sid}/config.json", mcdr)
-        else:
-            _control_interface.error(
-                f"Failed to add entry point! Plugin:{sid}|{enter_point}"
-            )
-    except Exception as e:
-        _control_interface.error(
-            f"Failed to get plugin control interface! {e}\nMaybe the ConnectCore plugin is not initialized, please reload this Plugin when you initialize ConnectCore."
-        )
-        return None
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        # 客户端配置中含有 account 和 password 字段
+        if "account" in raw and "password" in raw:
+            return False
+        return True
+    except Exception:
+        return True
 
 
-# MCDR Start point
-def on_load(server: PluginServerInterface, _):
+def get_plugin_control_interface(
+    sid: str, enter_point: Any, mcdr: PluginServerInterface
+) -> Optional[PluginControlInterface]:
+    from connect_core.tools.base_config import BaseConfig
+
+    config_path = Path(f"{GlobalContext.get_path().parent}/config/{sid}/config.yml")
+    try:
+        config_file = BaseConfig.load(config_path=config_path)
+    except Exception:
+        config_file = None
+    return PluginControlInterface(sid, None, config_file, mcdr)
+
+
+def on_load(server: PluginServerInterface, _: Any) -> None:
     global __mcdr_server, _control_interface
     __mcdr_server = server
+
+    # 在 GlobalContext 初始化前先确定 server_mode
+    config_path = Path(
+        f"{Path(server.get_data_folder()).parent}/connect_core/config.yml"
+    )
+    is_server = _detect_server_mode(config_path)
+
+    GlobalContext(debug=0, server=is_server, mcdr=True, mcdr_interface=server)
     _control_interface = CoreControlInterface()
 
+    from connect_core.mcdr.commands import CommandActions
+
     CommandActions(__mcdr_server, _control_interface)
+
     init_plugin_main(_control_interface)
+
     _control_interface.info(_control_interface.tr("mcdr.config_loaded"))
-    _control_interface.info(
-        _control_interface.tr("mcdr.plugin_loaded", "Connect Core")
-    )
-    if _control_interface.get_config():
-        if _control_interface.is_server():
+    _control_interface.info(_control_interface.tr("mcdr.plugin_loaded"))
+
+    if GlobalContext.get_config_path().exists():
+        if _control_interface.is_server:
             aes_main(_control_interface)
             register_system_main(_control_interface)
-            websocket_server_main(_control_interface)
+            websocket_server_main(
+                _control_interface
+            )  # pyright: ignore[reportCallIssue]
         else:
-            aes_main(_control_interface, _control_interface.get_config("password"))
-            websocket_client_main(_control_interface)
+            aes_main(_control_interface, _control_interface.config.password)  # type: ignore[union-attr]
+            websocket_client_main(
+                _control_interface
+            )  # pyright: ignore[reportCallIssue]
 
 
-def on_server_startup(_):
-    # 服务器启动后执行的代码
-    if not _control_interface.get_config():
-        _control_interface.error(
-            _control_interface.tr("mcdr.config_need_be_initialized")
-        )
+def on_server_startup(_: Any) -> None:
+    if not GlobalContext.get_config_path().exists():
+        if _control_interface:
+            _control_interface.error(
+                _control_interface.tr("mcdr.config_need_be_initialized")
+            )
 
 
-def on_unload(_):
-    # 插件卸载时执行的代码
-    if _control_interface.get_config("is_server", False):
-        websocket_server = websocket_server_stop()
-        _control_interface.info("Waiting for the WebSocket server to close...")
-        if websocket_server:
-            while not websocket_server.finish_close:
+def on_unload(_: Any) -> None:
+    if _control_interface is None:
+        return
+
+    if _control_interface.is_server:
+        ws = websocket_server_stop()
+        _control_interface.info("Waiting for WebSocket server to close...")
+        if ws:
+            while not ws.finish_close:
                 time.sleep(0.5)
-            _control_interface.info("WebSocket server closed.")
     else:
-        websocket_client = websocket_client_stop()
-        _control_interface.info("Waiting for the WebSocket client to close...")
-        if websocket_client:
-            while not websocket_client.finish_close:
+        ws = websocket_client_stop()  # type: ignore[assignment]
+        _control_interface.info("Waiting for WebSocket client to close...")
+        if ws:
+            while not ws.finish_close:
                 time.sleep(0.5)
-            _control_interface.info("WebSocket client closed.")

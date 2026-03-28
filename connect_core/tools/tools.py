@@ -1,30 +1,33 @@
+from __future__ import annotations
+
 import os
 import sys
 import time
 import base64
 import psutil
 import socket
-import requests
+import requests  # type: ignore[import-untyped]
 import functools
 import threading
-from typing import Optional, Union, Callable
+from typing import Any, Optional, Union, Callable
 
 try:
     from mcdreforged.api.all import new_thread
 except ImportError:
+
     class FunctionThread(threading.Thread):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             self.daemon = True  # 确保线程为守护线程
 
-    def new_thread(arg: Optional[Union[str, Callable]] = None):
+    def new_thread(arg: Optional[Union[str, Callable[..., Any]]] = None) -> Any:
         """
         启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
         """
 
-        def wrapper(func):
+        def wrapper(func: Callable[..., Any]) -> Callable[..., Any]:
             @functools.wraps(func)
-            def wrap(*args, **kwargs):
+            def wrap(*args: Any, **kwargs: Any) -> Any:
                 # 检查是否是类方法
                 if len(args) > 0 and hasattr(args[0], func.__name__):
                     # 将未绑定方法绑定到实例
@@ -40,10 +43,10 @@ except ImportError:
                 thread.start()
                 return thread
 
-            wrap.original = func  # 保留原始函数
+            wrap.original = func  # type: ignore[attr-defined]  # 保留原始函数
             return wrap
 
-        if isinstance(arg, Callable):  # @new_thread 用法
+        if callable(arg):  # @new_thread 用法
             thread_name = None
             return wrapper(arg)
         else:  # @new_thread(...) 用法
@@ -51,7 +54,9 @@ except ImportError:
             return wrapper
 
 
-def auto_trigger(interval: float, thread_name: Optional[str] = None):
+def auto_trigger(
+    interval: float, thread_name: Optional[str] = None
+) -> Callable[..., Any]:
     """
     创建一个自动触发的装饰器。
 
@@ -63,10 +68,10 @@ def auto_trigger(interval: float, thread_name: Optional[str] = None):
         Callable: 装饰后的函数。
     """
 
-    def decorator(func: Callable):
+    def decorator(func: Callable[..., Any]) -> Any:
         stop_event = threading.Event()
 
-        def trigger_loop(instance=None, *args, **kwargs):
+        def trigger_loop(instance: Any = None, *args: Any, **kwargs: Any) -> None:
             while not stop_event.is_set():
                 if instance:
                     wrapped_func = new_thread(thread_name)(func.__get__(instance))
@@ -76,7 +81,7 @@ def auto_trigger(interval: float, thread_name: Optional[str] = None):
                 time.sleep(interval)
 
         @new_thread(f"{thread_name or func.__name__}_trigger_loop")
-        def start_trigger(instance=None, *args, **kwargs):
+        def start_trigger(instance: Any = None, *args: Any, **kwargs: Any) -> Any:
             trigger_thread = threading.Thread(
                 target=trigger_loop,
                 args=(instance,) + args,
@@ -87,10 +92,10 @@ def auto_trigger(interval: float, thread_name: Optional[str] = None):
             trigger_thread.start()
             return trigger_thread
 
-        def stop():
+        def stop() -> None:
             stop_event.set()
 
-        start_trigger.stop = stop
+        start_trigger.stop = stop  # type: ignore[attr-defined]
         return start_trigger
 
     return decorator
@@ -102,11 +107,12 @@ def restart_program() -> None:
     """
     from connect_core.mcdr.mcdr_entry import get_mcdr
 
-    if not get_mcdr():
+    mcdr = get_mcdr()
+    if not mcdr:
         python = sys.executable
         os.execl(python, python, *sys.argv)
     else:
-        get_mcdr().reload_plugin("connect_core")
+        mcdr.reload_plugin("connect_core")
 
 
 def check_file_exists(file_path: str) -> bool:
@@ -166,7 +172,7 @@ def decode_base64(encoded_data: str) -> str:
     return decoded_bytes.decode("utf-8")
 
 
-def get_all_internal_ips() -> list:
+def get_all_internal_ips() -> list[str]:
     """
     获取所有网卡的内网IP地址
 
@@ -188,5 +194,6 @@ def get_external_ip() -> str:
     Returns:
         str: 一个公网IP
     """
-    response = requests.get("https://ifconfig.me/ip")
-    return response.text.strip()
+    response = requests.get("https://ifconfig.me/ip")  # noqa: S113
+    result: str = response.text.strip()
+    return result

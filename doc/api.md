@@ -1,1131 +1,480 @@
 # API
 
+本文档对应 `Project-Refactoring-Codespace` 当前实现，建议插件开发者统一从 `connect_core.api` 导入公开符号，而不是直接依赖内部模块路径。
+
+```python
+from connect_core.api import (
+    PluginControlInterface,
+    DataModel,
+    PacketType,
+    BaseConfig,
+)
+```
+
+## 公开导出总览
+
+`connect_core.api` 当前导出了以下能力：
+
+- 控制接口：`CoreControlInterface`、`PluginControlInterface`
+- 插件管理：`unload_plugin`、`reload_plugin`、`get_plugins`
+- 加密：`aes_encrypt`、`aes_decrypt`
+- 工具函数：`restart_program`、`check_file_exists`、`append_to_path`、`encode_base64`、`decode_base64`、`get_all_internal_ips`、`get_external_ip`、`new_thread`、`auto_trigger`
+- 数据包协议：`DataModel`、`DataPacket`（兼容别名）、`PacketType`、`PacketStatus`、`StatusRegistry`、`status_registry`、`PROTOCOL_VERSION`
+- 账号流程：`analyze_password`、`get_password`、`get_register_password`
+- MCDR：`get_plugin_control_interface`
+- 配置系统：`BaseConfig`、`ConfigError`、`ConfigTypeError`、`ConfigValidationError`、`Field`
+
+---
+
 ## Account
 
-`connect_core.api.account`
+### `analyze_password(key: str) -> dict`
 
-服务端密钥相关接口
+解析初始化密钥，返回连接所需的信息字典。
 
- 1. **analyze_password**
+**Args:**
+- `key` *(str)*: 服务端生成的初始化密钥
 
-    解析初始化密钥
+**Returns:**
+- `dict`: 包含连接所需信息的字典（如服务器地址、端口、加密参数等）
 
-    **Args:**
-    >key (str): 密钥
+### `get_password() -> str`
 
-    **Returns:**
-    >dict: 初始化字典
+获取当前服务端初始化密钥字符串。
 
-    ```python
-    def analyze_password(key: str) -> dict:
-    """
-    解析初始化密钥
+**Returns:**
+- `str`: 密钥字符串
 
-    Args:
-        key (str): 密钥
-    :return: 初始化字典
-    """
-    ```
+### `get_register_password() -> str`
 
- 2. **get_password**
+获取注册流程使用的临时密钥字符串。
 
-    获取初始化密钥
+**Returns:**
+- `str`: 密钥字符串
 
-    **Returns:**
-    >str: 密钥字符串
-
-    ```python
-    def get_password() -> str:
-    """
-    获取初始化密钥
-
-    :return str: 密钥字符串
-    """
-    ```
-
- 3. **def get_register_password**
-
-    获取初始化临时密钥
-
-    **Returns:**
-    >str: 密钥字符串
-
-    ```python
-    def get_register_password() -> str:
-    """
-    获取初始化临时密钥
-
-    :return: 密钥字符串
-    """
-    ```
+---
 
 ## Config
 
-`connect_core.api.config`
+当前 PRC 版本的配置系统已迁移到 **pydantic v2**，但保留了旧接口的大部分使用方式。
 
-配置文件生成相关代码
+### `ConfigError`
 
- 1. `Exception` **ConfigError**
+配置相关异常基类。
 
-    配置文件相关异常基类
+### `ConfigTypeError`
 
-    ```python
-    class ConfigError(Exception):
-        """配置相关异常基类"""
-    ```
+配置字段类型错误时抛出。
 
- 2. `Exception` **ConfigTypeError**
+### `ConfigValidationError`
 
-    配置类型错误
+配置验证失败异常类型，保留用于兼容旧 API。
 
-    ```python
-    class ConfigTypeError(ConfigError):
-        """配置类型错误"""
-    ```
+### `Field(default=..., description="")`
 
- 3. `Exception` **ConfigValidationError**
+向后兼容的字段工厂，内部委托给 `pydantic.Field`。
 
-    配置验证失败
+```python
+from connect_core.api import BaseConfig, Field
 
-    ```python
-    class ConfigValidationError(ConfigError):
-        """配置验证失败"""
-    ```
+class ExampleConfig(BaseConfig):
+    enabled: bool = Field(True, "是否启用")
+    endpoint: str = Field("127.0.0.1", "目标地址")
+```
 
- 4. `Class` **Field**
+### `class BaseConfig`
 
-    配置字段描述符
+基于 `pydantic.BaseModel` 的 YAML 配置基类。
 
-    ```python
-    class Field:
-        """配置字段描述符"""
+#### 主要特性
 
-        def __init__(self, default: Any, description: str = ""):
-            self.default = default
-            self.description = description
-    ```
+- 使用 `__config_path__` 指定默认配置路径
+- `load()` 在文件不存在时会自动创建默认配置
+- `save()` 会输出带注释的 YAML
+- 保留 `__fields__` 兼容视图，方便旧代码读取字段定义
+- `update(**kwargs)` 支持批量更新并触发类型校验
 
- 5. `Class` **BaseConfig**
+#### 常用方法
 
-    配置文件主基类
+##### `BaseConfig.load(config_path: str | PathLike | None = None) -> T`
 
-    **Args:**
-    >config_path (str): 配置文件保存目录
+从 YAML 加载配置；缺失字段会自动补全并写回文件。
 
-    ```python
-    class BaseConfig(metaclass=BaseConfigMeta):
-        __config_path__: str = "config.yml"  # 类级默认路径
+##### `save(config_path: str | PathLike | None = None) -> None`
 
-        def __init__(self, config_path: str = None, **kwargs):
-            """
-            初始化类，保存路径
+保存当前配置对象到 YAML。
 
-            Args:
-                config_path (str): 路径目录, 默认为"config.yml"
-            """
-    ```
+##### `update(**kwargs) -> None`
 
- 6. **BaseConfig.load**
+批量更新配置值；如果字段不存在或类型不匹配，会抛出 `ConfigError` / `ConfigTypeError`。
 
-    加载配置文件
+---
 
-    **Args:**
-    >config_path (str): 配置文件保存目录
+## Data Packet / Protocol
 
-    ```python
-    @classmethod
-    def load(cls: Type[T], config_path: str = None) -> T:
-        """
-        从YAML加载配置，若缺少字段则自动补全并写回文件
-        
-        Args:
-            config_path (str): 配置文件保存路径, 默认类__config_path__相关内部变量
-        """
-    ```
+> 当前重构版不再使用旧版的 `(数字 type, 数字 status)` 表示方式，而是统一使用字符串枚举 + `pydantic` 数据模型。
 
- 7. **BaseConfig.save**
+### `PacketType`
 
-    保存配置文件
+内置数据包类型枚举：
 
-    **Args:**
-    >config_path (str): 配置文件保存目录
+- `TEST_CONNECT`
+- `PING`
+- `PONG`
+- `CONTROL_STOP`
+- `CONTROL_RELOAD`
+- `CONTROL_MAINTENANCE`
+- `CONTROL_RESUME`
+- `REGISTER`
+- `REGISTERED`
+- `REGISTER_ERROR`
+- `LOGIN`
+- `LOGINED`
+- `NEW_LOGIN`
+- `DEL_LOGIN`
+- `LOGIN_ERROR`
+- `DATA_SEND`
+- `DATA_SENDOK`
+- `DATA_ERROR`
+- `FILE_SEND`
+- `FILE_SENDING`
+- `FILE_SENDOK`
+- `FILE_ERROR`
 
-    ```python
-    def save(self, config_path: str = None):
-        """
-        保存为带注释的YAML
-        
-        Args:
-            config_path (str): 配置文件保存路径, 默认类__config_path__相关内部变量
-        """
-    ```
+### `PacketStatus`
 
- 8. **BaseConfig.update**
+内置状态枚举：
 
-    批量更新配置项
-
-    **Args:**
-    >**kwargs: 配置项
-
-    ```python
-    def update(self, **kwargs):
-        """
-        批量更新配置
-        
-        Args:
-            kwargs: 配置项
-        """
-    ```
-
- 9. **BaseConfig.print_config**
-
-    打印当前所有配置项
-
-    ```python
-    def print_config(self):
-        """打印当前配置"""
-    ```
-
-## Data Packet
-
-`connect_core.api.data_packet`
-
-数据包相关代码
-
- 1. `Class` **DataPacket**
-
-    数据包类，包含数据包的类型和内容
-
-    预设的类型和内容：
-
-    ```python
-    self.TYPE_TEST_CONNECT = (-1, 0)
-    self.TYPE_PING = (0, 1)
-    self.TYPE_PONG = (0, 2)
-    self.TYPE_CONTROL_STOP = (1, 0)
-    self.TYPE_CONTROL_RELOAD = (1, 1)
-    self.TYPE_CONTROL_MAINTENANCE = (1, 2)
-    self.TYPE_CONTROL_RESUME = (1, 3)
-    self.TYPE_REGISTER = (2, 0)
-    self.TYPE_REGISTERED = (2, 1)
-    self.TYPE_REGISTER_ERROR = (2, 2)
-    self.TYPE_LOGIN = (3, 0)
-    self.TYPE_LOGINED = (3, 1)
-    self.TYPE_NEW_LOGIN = (3, 2)
-    self.TYPE_DEL_LOGIN = (3, 3)
-    self.TYPE_LOGIN_ERROR = (3, 4)
-    self.TYPE_DATA_SEND = (4, 0)
-    self.TYPE_DATA_SENDOK = (4, 1)
-    self.TYPE_DATA_ERROR = (4, 2)
-    self.TYPE_FILE_SEND = (5, 0)
-    self.TYPE_FILE_SENDING = (5, 1)
-    self.TYPE_FILE_SENDOK = (5, 2)
-    self.TYPE_FILE_ERROR = (5, 3)
+- `REQUEST`
+- `OK`
+- `ERROR`
+- `SENDING`
+- `NEW`
+- `DEL`
+- `STOP`
+- `RELOAD`
+- `MAINTENANCE`
+- `RESUME`
 
-    self.DEFAULT_TO_FROM = ("-----", "-----")
-    self.DEFAULT_SERVER = ("-----", "system")
-    self.DEFAULT_ALL = ("all", "system")
-    ```
-
-    详情见：[websocket.md](./websocket.md)。
+> `DataModel.status` 实际允许任意字符串，因此第三方插件可以注册自定义状态。
 
- 2. **DataPacket.get_data_packet**
-
-    获取数据包格式
-
-    **Args:**
-    >Type (tuple): 数据包类型和状态
-    >ToInfo (tuple): 数据包目标信息
-    >FromInfo (tuple): 数据包来源信息
-    >Data (any): 数据
-
-    **Returns:**
-    >dict: 数据包字典
-
-    ```python
-    def get_data_packet(
-        self, Type: tuple, ToInfo: tuple, FromInfo: tuple, Data: any
-    ) -> dict:
-        """
-        获取数据包格式
+### `PROTOCOL_VERSION: int = 1`
 
-        Args:
-            Type (tuple): 数据包类型和状态
-            ToInfo (tuple): 数据包目标信息
-            FromInfo (tuple): 数据包来源信息
-            Data (any): 数据
-        :return: 数据包字典
-        """
-    ```
+当前协议版本号。客户端在 `REGISTER` / `LOGIN` 握手时会携带该版本，服务端会校验版本一致性。
 
- 3. **DataPacket.get_history_packet**
+### `class DataModel`
 
-    获取历史数据包
+统一的数据包模型；`DataPacket` 是它的兼容别名。
 
-    **Args:**
-    >server_id (str): 服务器id
-    >old_sid (int): 旧sid\
+#### 模型结构
 
-    **Returns:**
-    >list: 历史数据包
-
-    ```python
-    def get_history_packet(self, server_id: str, old_sid: int) -> list:
-        """
-        获取历史数据包
+```python
+{
+    "type": "data_send",
+    "status": "ok",
+    "sid": 12,
+    "to": ["target_server", "target_plugin"],
+    "from": ["source_server", "source_plugin"],
+    "payload": {"message": "hello"},
+    "timestamp": 1710000000.0,
+    "checksum": "..."
+}
+```
 
-        Args:
-            server_id (str): 服务器id
-            old_sid (int): 旧sid
-        :return: 历史数据包
-        """
-    ```
+#### 字段说明
 
- 4. **DataPacket.add_recv_packet**
+- `type`: `PacketType`
+- `status`: `str | None`，可为空，也可自定义
+- `sid`: 数据包序号
+- `to`: `(server_id, plugin_id)`
+- `from`: 序列化别名；在 Python 属性中为 `from_`
+- `payload`: 业务数据
+- `timestamp`: 时间戳
+- `checksum`: 校验和；若 `payload` 存在且未提供，将自动生成 MD5
 
-    添加接收到的数据包
+### `class StatusRegistry`
 
-    **Args:**
-    >server_id (str): 服务器id
-    >packet (dict): 数据包
+用于给指定 `PacketType` 注册自定义状态和处理器。
 
-    ```python
-    def add_recv_packet(self, server_id: str, packet: dict) -> None:
-        """
-        添加接收到的数据包
+#### 常用方法
 
-        Args:
-            server_id (str): 服务器id
-            packet (dict): 数据包
-        """
-    ```
+##### `register_status(packet_type: PacketType, status: str) -> None`
 
- 5. **DataPacket.del_server_id**
+注册某个数据包类型下的自定义状态。
 
-    删除指定服务器id的数据包
+##### `register_handler(packet_type: PacketType, status: str, callback: Callable) -> None`
 
-    **Args:**
-    >server_id (str): 服务器id
+为 `(packet_type, status)` 注册回调。
 
-    ```python
-    def del_server_id(self, server_id: str) -> None:
-        """
-        删除指定服务器id的数据包
+- 回调参数：`callback(packet: DataModel)`
+- 支持同步函数与异步协程函数
 
-        Args:
-            server_id (str): 服务器id
-        """
-    ```
+##### `unregister_handler(packet_type: PacketType, status: str, callback: Callable) -> None`
 
- 6. **DataPacket.get_file_hash**
+取消注册处理器。
 
-    获取指定文件的哈希值。默认使用 'sha256' 算法。
+##### `get_registered_statuses(packet_type: PacketType) -> set[str]`
 
-    **Args:**
-    >file_path (str): 文件路径
-    >algorithm (str): 哈希算法，默认使用 'sha256'
+获取指定类型已注册的自定义状态集合。
 
-    **Returns:**
-    >str: 文件的哈希值，如果文件不存在则返回 None
+### `status_registry`
 
-    ```python
-    def get_file_hash(self, file_path, algorithm="sha256") -> str | None:
-        """
-        获取文件的哈希值。
+全局状态注册器实例。
 
-        Args:
-            file_path (str): 文件路径
-            algorithm (str): 哈希算法，默认使用 'sha256'
+```python
+from connect_core.api import PacketType, status_registry
 
-        Returns:
-            str: 文件的哈希值，如果文件不存在则返回 None
-        """
-    ```
+status_registry.register_status(PacketType.DATA_SEND, "my_status")
+```
 
- 7. **DataPacket.verify_file_hash**
+更实际的写法如下：
 
-    验证指定文件的哈希值是否与预期的哈希值匹配。默认使用 'sha256' 算法。
+```python
+from connect_core.api import PacketType, status_registry
 
-    **Args:**
-    >file_path (str): 文件路径
-    >expected_hash (str): 预期的哈希值
-    >algorithm (str): 哈希算法，默认使用 'sha256'
 
-    **Returns:**
-    >bool: 如果哈希值匹配则返回 True，否则返回 False
+def handle_custom(packet):
+    print(packet.payload)
 
-    ```python
-    def verify_file_hash(self, file_path, expected_hash, algorithm="sha256") -> bool:
-        """
-        验证文件的哈希值。
+status_registry.register_status(PacketType.DATA_SEND, "plugin.custom")
+status_registry.register_handler(PacketType.DATA_SEND, "plugin.custom", handle_custom)
+```
 
-        Args:
-            file_path (str): 文件路径
-            expected_hash (str): 预期的哈希值
-            algorithm (str): 哈希算法，默认使用 'sha256'
-
-        Returns:
-            bool: 如果哈希值匹配则返回 True，否则返回 False
-        """
-    ```
-
- 8. **DataPacket.generate_md5_checksum**
-
-    验证文件的哈希值。
-
-    **Args:**
-    >data (bytes): 数据
-
-    **Returns:**
-    >str: MD5 哈希值
-
-    ```python
-    def generate_md5_checksum(self, data):
-        """
-        验证文件的哈希值。
-
-        Args:
-            data: 数据
-
-        Returns:
-            str: MD5 哈希值
-
-        """
-    ```
-
- 9. **DataPacket.verify_md5_checksum**
-
-    校验数据是否匹配给定的 MD5 校验和。
-
-    **Args:**
-    >data (bytes): 数据
-    >checksum (str): MD5 校验和
-
-    **Returns:**
-    >bool: 如果哈希值匹配则返回 True，否则返回 False
-
-    ```python
-    def verify_md5_checksum(self, data, checksum) -> bool:
-        """
-        校验数据是否匹配给定的 MD5 校验和。
-
-        :param data: 输入数据，类型为 bytes。
-        :param checksum: 输入的 MD5 校验和，类型为 str。
-        :return: 如果校验通过返回 True，否则返回 False。
-        """
-    ```
+---
 
 ## Interface
 
-`connect_core.api.interface`
+### `CoreControlInterface`
 
-控制器接口模块
+ConnectCore 核心控制接口，提供日志、配置、翻译、命令行与 WebSocket 查询能力。
 
- 1. `Class` **ControlInterface**
+### 常用属性
 
-    控制器接口类
+#### `logger -> logging.Logger`
 
- 2. **ControlInterface.get_config**
+标准日志接口。
 
-    获取配置文件，如果配置文件不存在或为空则不会写入到配置文件中，请使用`save_config`初始化
+#### `struct_logger -> structlog.stdlib.BoundLogger`
 
-    **Args:**
-    >key (str): 配置项名称, 默认为 "all", 表示读取所有配置项
-    >default (any): 默认值, 如果配置项不存在则返回默认值且写入到配置文件中
-    >config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
+结构化日志接口。
 
-    **Returns:**
-    >dict: 配置文件字典
+#### `config -> ServerConfig | ClientConfig`
 
-    ```python
-    def get_config(self, config_path: str = None) -> dict:
-        """
-        获取配置文件，如果配置文件不存在或为空则不会写入到配置文件中，请使用`save_config`初始化
+当前主配置对象。
 
-        Args:
-            key (str): 配置项名称, 默认为 "all", 表示读取所有配置项
-            default (any): 默认值, 如果配置项不存在则返回默认值且写入到配置文件中
-            config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
+### 常用方法
 
-        Returns:
-            dict: 配置文件字典
-        """
-    ```
+#### `get_config(key="all", default=None, config_path=None) -> Any`
 
- 3. **ControlInterface.save_config**
+读取配置。
 
-    写入配置文件
+> ⚠️ 如果配置文件不存在或为空，调用此方法**不会**自动写入到配置文件中。请先使用 `save_config` 进行初始化。
 
-    **Args:**
-    >config_data (dict): 新的配置项字典
-    >config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
+**Args:**
+- `key` *(str)*: 配置键名，默认 `"all"` 返回完整配置
+- `default` *(Any)*: 键不存在时的默认值
+- `config_path` *(str, optional)*: 辅助配置文件路径
 
-    ```python
-    def save_config(self, config_data: dict, config_path: str = None) -> None:
-        """
-        写入配置文件
+**Returns:**
+- `Any`: 配置值或完整配置对象
 
-        Args:
-            config_data (dict): 新的配置项字典
-            config_path (str): 配置文件目录, 默认为插件或服务器默认 config 路径
-        """
-    ```
+- 不传 `config_path`：读取主配置模型
+- 传入 `config_path`：读取 `config/connect_core/<filename>` 下的辅助 JSON 配置
 
- 4. **ControlInterface.translate**
+#### `save_config(config_data, config_path=None) -> None`
 
-    获取翻译项
+保存配置。
 
-    **Args:**
-    >key (str): 翻译文件关键字
-    >*args (tuple): 字段插入内容
+- `config_data` 为 `BaseConfig` 实例时：直接保存 YAML
+- `config_data` 为 `dict` 且提供 `config_path` 时：写入辅助 JSON 配置
+- `config_data` 为 `dict` 且不提供 `config_path` 时：更新主配置字段并保存
 
-    **Returns:**
-    >str: 翻译文本
+#### `translate(key: str, *args) -> str`
 
-    ```python
-    def translate(self, key: str, *args) -> str:
-        """
-        获取翻译项
+读取翻译文本。
 
-        Args:
-            key (str): 翻译文件关键字
-            *args (tuple): 字段插入内容
+#### `tr(key: str, *args) -> str`
 
-        Returns:
-            str: 翻译文本
-        """
-    ```
+`translate` 的别名。
 
- 5. **ControlInterface.tr**
+#### `info(msg) / warn(msg) / warning(msg) / error(msg)`
 
-    获取翻译项 | `translate函数的别称`
+输出不同级别日志。
 
-    **Args:**
-    >key (str): 翻译文件关键字
-    >*args (tuple): 字段插入内容
+#### `debug(msg, level=1)`
 
-    **Returns:**
-    >str: 翻译文本
+输出调试日志，只有当 `GlobalContext` 的调试等级不低于 `level` 时才会真正打印。
 
-    ```python
-    def tr(self, key: str, *args):
-        """
-        获取翻译项 | `translate函数的别称`
+#### `get_server_list() -> list`
 
-        Args:
-            key (str): 翻译文件关键字
-            *args (tuple): 字段插入内容
+获取当前已知服务器列表：
 
-        Returns:
-            str: 翻译文本
-        """
-    ```
+- 服务端模式：返回所有已连接子服 ID
+- 客户端模式：返回服务端广播给当前客户端的服务器列表
 
- 6. **ControlInterface.info**
+#### `get_server_id() -> str`
 
-    输出INFO级别的日志信息
+客户端模式下返回当前客户端账号 / server_id；服务端模式固定返回 `"-----"`。
 
-    **Args:**
-    >msg (any): 日志消息内容。
+#### `get_history_data_packet(server_id: str | None = None) -> list`
 
-    ```python
-    def info(self, msg: any):
-        """
-        输出INFO级别的日志信息。
+读取历史数据包。
 
-        Args:
-            msg (any): 日志消息内容。
-        """
-    ```
+- 服务端模式：需要传入 `server_id`
+- 客户端模式：忽略参数，返回本地历史记录
 
- 7. **ControlInterface.warn**
+#### `get_recent_packets(limit: int = 20, server_id: str | None = None) -> list`
 
-    输出WARN级别的日志信息
+读取最近数据包，返回值中额外包含：
 
-    **Args:**
-    >msg (any): 日志消息内容。
+- `direction`: `sent` / `received`
+- `server_id`: 数据包所属服务器
 
-    ```python
-    def warn(self, msg: any):
-        """
-        输出WARN级别的日志信息。
+### `command_control`
 
-        Args:
-            msg (any): 日志消息内容。
-        """
-    ```
+命令控制器对象，提供以下方法：
 
- 8. **ControlInterface.error**
+- `bind_cli(cli)`
+- `add_command(command, func, *, argument_specs=None, pass_context=False)`
+- `remove_command(command)`
+- `set_prompt(prompt)`
+- `set_completer_words(words)`
+- `remove_sid(target_sid)`
+- `flush_cli()`
 
-    输出ERROR级别的日志信息
+---
 
-    **Args:**
-    >msg (any): 日志消息内容。
+### `PluginControlInterface`
 
-    ```python
-    def error(self, msg: any):
-        """
-        输出ERROR级别的日志信息。
+插件控制接口，继承自 `CoreControlInterface`，额外提供插件向网络发送数据/文件的能力。
 
-        Args:
-            msg (any): 日志消息内容。
-        """
-    ```
+### 构造参数
 
- 9. **ControlInterface.debug**
+```python
+PluginControlInterface(
+    sid: str,
+    self_path: str | None,
+    config_file: BaseConfig | None,
+    mcdr_core: PluginServerInterface | None = None,
+)
+```
 
-    输出DEBUG级别的日志信息
+### `send_data(server_id: str, plugin_id: str, data: dict) -> None`
 
-    **Args:**
-    >msg (any): 日志消息内容。
+向目标服务器上的目标插件发送 JSON 数据。
 
-    ```python
-    def debug(self, msg: any):
-        """
-        输出DEBUG级别的日志信息。
+### `send_file(server_id: str, plugin_id: str, file_path: str, save_path: str) -> None`
 
-        Args:
-            msg (any): 日志消息内容。
-        """
-    ```
+向目标服务器上的目标插件发送文件。
 
-10. **ControlInterface.is_server**
+---
 
-    判断是否为服务器
+## Plugin Management
 
-    **Returns:**
-    >bool: 是/否
+### `unload_plugin(sid: str) -> None`
 
-    ```python
-    def is_server(self) -> bool:
-        """
-        判断是否为服务器
+卸载插件。独立模式下会级联卸载依赖它的插件。
 
-        Returns:
-            bool: 是/否
-        """
-    ```
+### `reload_plugin(sid: str) -> None`
 
-11. **ControlInterface.get_server_list**
+重载插件。独立模式下会先按依赖顺序卸载，再按拓扑顺序重新加载。
 
-    获取服务器列表
+### `get_plugins() -> dict[str, dict]`
 
-    **Returns:**
-    >list: 服务器列表
+获取当前已加载插件的 manifest 信息。
 
-    ```python
-    def get_server_list(self) -> list:
-        """
-        获取服务器列表
-        
-        Returns:
-            list: 服务器列表
-        """
-    ```
+---
 
-12. **ControlInterface.get_server_id**
+## Encryption
 
-    获取客户端的服务器ID。
+### `aes_encrypt(data: bytes | str, password: str | None = None) -> bytes`
 
-    **Returns:**
-    >str: 服务器ID
+对数据进行 AES 加密。若不显式传入密码，则使用当前全局密钥上下文。
 
-    ```python
-    def get_server_id(self) -> str:
-        """
-        客户端反馈服务器ID
+### `aes_decrypt(data: bytes | str, password: str | None = None) -> bytes`
 
-        Returns:
-            str: 服务器ID
-        """
-    ```
+对数据进行 AES 解密。
 
-13. **ControlInterface.add_command**
-
-    添加命令到命令行界面中。
-
-    **Args:**
-    >command (str): 命令名称。
-    >func (callable): 命令对应的函数。
-
-    ```python
-    def add_command(self, command: str, func: callable):
-        """
-        添加命令到命令行界面中。
-
-        Args:
-            command (str): 命令名称。
-            func (callable): 命令对应的函数。
-        """
-    ```
-
-14. **ControlInterface.remove_command**
-
-    移除命令从命令行界面中。
-
-    **Args:**
-    >command (str): 命令名称。
-
-    ```python
-    def remove_command(self, command: str):
-        """
-        移除命令从命令行界面中。
-
-        Args:
-            command (str): 命令名称。
-        """
-    ```
-
-15. **ControlInterface.set_prompt**
-
-    设置命令行提示符。
-
-    **Args:**
-    >prompt (str): 命令行提示符内容。
-
-    ```python
-    def set_prompt(self, prompt: str):
-        """
-        设置命令行提示符。
-
-        Args:
-            prompt (str): 命令行提示符内容。
-        """
-    ```
-
-16. **ControlInterface.set_completer_words**
-
-    设置命令行补全词典。
-
-    **Args:**
-    >words (dict): 命令行补全词典内容。
-
-    ```python
-    def set_completer_words(self, words: dict):
-        """
-        设置命令行补全词典。
-
-        Args:
-            words (dict): 命令行补全词典内容。
-        """
-    ```
-
-17. **ControlInterface.flush_cli**
-
-    刷新命令行补全词典。
-
-    ```python
-    def flush_cli(self) -> None:
-        """
-        刷新命令行补全词典。
-        """
-    ```
-
-18. `Class` **PluginControlInterface**
-
-    插件控制接口，继承自 `CoreControlInterface`。
-
-    **Args:**
-    >sid (str): 插件ID
-    >sinfo (dict): 插件Info
-    >self_path (str): 自身路径
-    >config_path (str): 配置文件路径
-
-    ```python
-    class PluginControlInterface(CoreControlInterface):
-        def __init__(self, sid: str, sinfo: dict, self_path: str, config_path: str):
-            """
-            插件控制接口
-
-            Args:
-                sid (str): 插件ID
-                sinfo (dict): 插件Info
-                self_path (str): 自身路径
-                config_path (str): 配置文件路径
-            """
-            # 导入
-            super().__init__()
-
-            self.sid = sid
-            self.self_path = self_path
-            self.config_path = config_path
-            self.mcdr = mcdr
-    ```
-
-19. **PluginControlInterface.send_data**
-
-    向指定的服务器发送消息。
-
-    **Args:**
-    >server_id (str): 目标服务器的唯一标识符。
-    >plugin_id (str): 目标服务器插件的唯一标识符
-    >data (dict): 要发送的数据。
-
-    ```python
-    def send_data(self, server_id: str, plugin_id: str, data: dict):
-        """
-        向指定的服务器发送消息。
-
-        Args:
-            server_id (str): 目标服务器的唯一标识符。
-            plugin_id (str): 目标服务器插件的唯一标识符
-            data (dict): 要发送的数据。
-        """
-    ```
-
-20. **PluginControlInterface.send_file**
-
-    向指定的服务器发送文件。
-
-    **Args:**
-    >server_id (str): 目标服务器的唯一标识符。
-    >plugin_id (str): 目标服务器插件的唯一标识符
-    >file_path (str): 要发送的文件目录。
-    >save_path (str): 要保存的位置。
-
-    ```python
-    def send_file(
-        self, server_id: str, plugin_id: str, file_path: str, save_path: str
-    ):
-        """
-        向指定的服务器发送文件。
-
-        Args:
-            server_id (str): 目标服务器的唯一标识符。
-            plugin_id (str): 目标服务器插件的唯一标识符
-            file_path (str): 要发送的文件目录。
-            save_path (str): 要保存的位置。
-        """
-    ```
-
-21. **PluginControlInterface.get_history_packet**
-
-    获取历史数据包。
-
-    **Args:**
-    >str: 服务器ID
-
-    **Returns:**
-    >dict: 数据包
-
-    ```python
-    def get_history_packet(self, server_id: str = None) -> list | None:
-        """
-        获取历史数据包，客户端无需参数
-
-        Args:
-            server_id (str): 服务器ID
-
-        Returns:
-            dict: 数据包
-        """
-    ```
+---
 
 ## MCDR
 
-`connect_core.api.mcdr`
+### `get_plugin_control_interface(sid, enter_point, mcdr) -> PluginControlInterface | None`
 
-MCDR插件的API。
+为 MCDR 插件创建一个 `PluginControlInterface`。
 
-1. **get_plugin_control_interface**
+```python
+from mcdreforged.api.all import *
+from connect_core.api import get_plugin_control_interface
 
-    获取插件控制接口。
+_control = None
 
-    **Args:**
-    >sid (str): 服务器ID
-    >enter_point (str): 入口点
-    >mcdr (PluginServerInterface): MCDR接口
 
-    **Returns:**
-    >PluginControlInterface: 插件控制接口
+def on_load(server: PluginServerInterface, _):
+    global _control
+    _control = get_plugin_control_interface(
+        "example_plugin",
+        "example_plugin.mcdr.entry",
+        server,
+    )
+```
 
-    ```python
-    def get_plugin_control_interface(
-        sid: str, enter_point: str, mcdr: PluginServerInterface
-    ) -> PluginControlInterface:
-        """
-        获取插件控制接口
+> 当前 PRC 实现中，`enter_point` 主要用于兼容旧 API；MCDR 模式下 ConnectCore 不负责加载第三方 MCDR 插件归档，也不会像独立模式那样自动分发插件事件。
 
-        Args:
-            sid (str): 插件ID
-            enter_point (str): 入口点
-            mcdr (PluginServerInterface): MCDR接口
-        Returns:
-            PluginControlInterface: 插件控制接口
-        """
-    ```
-
-## Plugin
-
-`connect_core.api.plugin`
-
-控制插件的API。
-
- 1. **unload_plugin**
-
-    卸载插件。
-
-    **Args:**
-    >sid (str): 服务器ID
-
-    ```python
-    def unload_plugin(sid: str):
-        """
-        卸载插件
-
-        Args:
-            sid (str): 插件ID
-        """
-    ```
-
- 2. **reload_plugin**
-
-    重载插件。
-
-    **Args:**
-    >sid (str): 服务器ID
-
-    ```python
-    def reload_plugin(sid: str):
-        """
-        重载插件
-
-        Args:
-            sid (str): 插件ID
-        """
-    ```
-
- 3. **get_plugins**
-
-    获取插件列表。
-
-    **Returns:**
-    >dict: 插件列表
-
-    ```python
-    def get_plugins() -> dict:
-        """
-        获取插件列表
-
-        :return: 插件列表
-        """
-    ```
-
-## RSA
-
-`connect_core.api.rsa`
-
-RSA加密模块。
-
- 1. **rsa_encrypt**
-
-    RSA加密数据。
-
-    **Args:**
-    >data (bytes): 要加密的数据。
-
-    **Returns:**
-    >bytes: 加密后的数据。
-
-    **Exceptions:**
-    >InvalidToken: 如果未初始化密码或初始化错误时抛出异常。
-
-    ```python
-    def aes_encrypt(data: bytes) -> bytes:
-        """
-        加密数据
-
-        Args:
-            data (bytes): 需要加密的字节数据。
-
-        Returns:
-            bytes: 加密后的字节数据。
-
-        Exceptions:
-            InvalidToken: 如果未初始化密码或初始化错误时抛出异常。
-        """
-    ```
-
- 2. **aes_decrypt**
-
-    RSA解密数据。
-
-    **Args:**
-    >data (bytes): 要解密的数据。
-
-    **Returns:**
-    >bytes: 解密后的数据。
-
-    **Exceptions:**
-    >InvalidToken: 如果未初始化密码、数据为空或解密失败时抛出异常。
-
-    ```python
-    def aes_decrypt(data: bytes) -> bytes:
-        """
-        解密数据
-
-        Args:
-            data (bytes): 需要解密的字节数据。
-
-        Returns:
-            bytes: 解密后的字节数据。
-
-        Exceptions:
-            InvalidToken: 如果未初始化密码、数据为空或解密失败时抛出异常。
-        """
-    ```
+---
 
 ## Tools
 
-`connect_core.api.tools`
+### `new_thread(arg=None)`
 
-实用工具
+线程装饰器。被装饰函数调用后会立即在线程中执行，并返回线程对象。
 
- 1. **new_thread**
+### `auto_trigger(interval: float, thread_name: str | None = None)`
 
-    启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
+定时触发装饰器，常用于自动心跳、自动重发等后台任务。
 
-    ```python
-    def new_thread(arg: Optional[Union[str, Callable]] = None):
-        """
-        启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
-        """
-    ```
+### `restart_program() -> None`
 
- 2. **auto_trigger**
+重启当前程序；在 MCDR 模式下会改为请求重载 `connect_core` 插件。
 
-    定时启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
+### `check_file_exists(file_path: str) -> bool`
 
-    ```python
-    def auto_trigger(interval: float, thread_name: Optional[str] = None):
-        """
-        定时启动一个新的线程运行装饰的函数，同时支持类方法和普通函数。
-        """
-    ```
+检查文件是否存在。
 
- 3. **restart_program**
+### `append_to_path(path: str, filename: str) -> str`
 
-    重启程序，使用当前的Python解释器重新执行当前脚本。
+若 `path` 是目录，则自动拼接文件名；否则原样返回。
 
-    ```python
-    def restart_program() -> None:
-        """
-        重启程序，使用当前的Python解释器重新执行当前脚本。
-        """
-    ```
+### `encode_base64(data: str) -> str`
 
- 4. **check_file_exists**
+Base64 编码。
 
-    检查目录中的特定文件是否存在。
+### `decode_base64(encoded_data: str) -> str`
 
-    **Args**:
-    >file_path (str): 文件路径
+Base64 解码。
 
-    **Returns**:
-    >bool: 如果文件存在则返回 True，否则返回 False
+### `get_all_internal_ips() -> list[str]`
 
-    ```python
-    def check_file_exists(file_path) -> bool:
-        """
-        检查目录中的特定文件是否存在。
+获取所有网卡的 IPv4 内网地址。
 
-        Args:
-            file_path (str): 文件路径
+### `get_external_ip() -> str`
 
-        Returns:
-            bool: 如果文件存在则返回 True，否则返回 False
-        """
-    ```
+通过外部服务查询当前公网 IP。
 
- 5. **append_to_path**
+---
 
-    如果给定的路径是一个目录，则将文件名附加到该路径上。
+## 向后兼容说明
 
-    **Args**:
-    >path (str): 要检查和修改的路径。
-    >filename (str): 如果路径是目录，则附加的文件名。
+PRC 仓库为了兼容旧版插件，保留了以下关键兼容层：
 
-    **Returns**:
-    >str: 修改后的路径。
+- `DataPacket` 仍可导入，但其实际类型为 `DataModel`
+- `BaseConfig.__fields__` 提供兼容视图
+- `CoreControlInterface.get_config()` / `save_config()` 保留旧调用风格
+- `get_plugin_control_interface()` 仍保留旧签名中的 `enter_point` 参数
 
-    ```python
-    def append_to_path(path, filename) -> str:
-        """
-        如果给定的路径是一个目录，则将文件名附加到该路径上。
-        :param path: 要检查和修改的路径。
-        :param filename: 如果路径是目录，则附加的文件名。
-        :return: 修改后的路径。
-        """
-    ```
+如果你正在开发新插件，建议优先使用：
 
- 6. **encode_base64**
-
-    对输入的数据进行Base64编码。
-
-    **Args**:
-    >data (str): 需要编码的字节数据
-
-    **Returns**:
-    >str: 编码后的字符串。
-
-    ```python
-    def encode_base64(data: str) -> str:
-        """
-        对输入的数据进行Base64编码
-
-        Args:
-            data (str): 需要编码的字节数据
-        :return: 编码后的字符串
-        """
-    ```
-
- 7. **decode_base64**
-
-    对Base64编码的数据进行解码。
-
-    **Args**:
-    >encoded_data (str): Base64编码的字符串
-
-    **Returns**:
-    >str: 解码后的字节数据。
-
-    ```python
-    def decode_base64(encoded_data: str) -> str:
-        """
-        对Base64编码的数据进行解码
-
-        Args:
-            encoded_data(str): Base64编码的字符串
-        :return: 解码后的字节数据
-        """
-    ```
-
- 8. **get_all_internal_ips**
-
-    获取所有网卡的内网IP地址。
-
-    **Returns**:
-    >list: 一个列表, 包含所有内网IP地址
-
-    ```python
-    def get_all_internal_ips() -> list:
-        """
-        获取所有网卡的内网IP地址
-        :return: 一个列表, 包含所有内网IP地址
-        """
-    ```
-
- 9. **get_external_ip**
-
-    获取公网地址。
-
-    **Returns**:
-    >str: 一个公网IP
-
-    ```python
-    def get_external_ip() -> str:
-        """
-        获取公网地址
-        :return: 一个公网IP
-        """
-    ```
+- `DataModel` 而不是 `DataPacket`
+- `PacketType` / `PacketStatus` 而不是手写字符串常量
+- `status_registry` 注册扩展状态与处理器
+- `BaseConfig` + `Field` 定义强类型配置
