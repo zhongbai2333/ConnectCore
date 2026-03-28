@@ -6,7 +6,7 @@ on:
     tags: [ "v*" ]
     paths: 
       - '**.py'          # 所有 Python 文件
-      - 'requirements.txt' # 依赖清单
+      - 'pyproject.toml'   # 依赖清单
       - 'mcdreforged.plugin.json'
       - '.github/workflows/package.yml' # CI 文件
   pull_request:
@@ -25,14 +25,14 @@ jobs:
     - uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install .[mcdr]
 
     - name: Pack Plugin
       run: |
