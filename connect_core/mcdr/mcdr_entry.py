@@ -3,7 +3,16 @@ from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
 import yaml  # type: ignore[import-untyped]
-from mcdreforged.api.all import PluginServerInterface
+
+try:
+    from mcdreforged.api.all import PluginServerInterface
+except ImportError:
+    # 在非 MCDR 环境下（CLI 模式）允许此模块仍能被导入，
+    # 仅当真正进入 MCDR 入口（如 on_load）时才需要 mcdreforged。
+    if TYPE_CHECKING:
+        from mcdreforged.api.all import PluginServerInterface
+    else:
+        PluginServerInterface = Any  # type: ignore[assignment,misc]
 
 from connect_core.context import GlobalContext
 from connect_core.aes_encrypt import aes_main
