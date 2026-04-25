@@ -32,13 +32,15 @@ except ImportError:
                 if len(args) > 0 and hasattr(args[0], func.__name__):
                     # 将未绑定方法绑定到实例
                     bound_func = func.__get__(args[0])
+                    thread_args = args[1:]  # bound_func 已含 self，不再重复传递
                 else:
                     # 普通函数
                     bound_func = func
+                    thread_args = args
 
                 # 创建线程
                 thread = FunctionThread(
-                    target=bound_func, args=args, kwargs=kwargs, name=thread_name
+                    target=bound_func, args=thread_args, kwargs=kwargs, name=thread_name
                 )
                 thread.start()
                 return thread
