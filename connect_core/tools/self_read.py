@@ -26,14 +26,24 @@ class YmlLanguage:
     # 读取yaml
     def _read_yaml(self, lang: str = "en_us") -> dict[str, Any]:
         if zipfile.is_zipfile(self.full_path):
-            with zipfile.ZipFile(self.full_path, "r") as pyz:
-                with pyz.open(f"lang/{lang}.yml") as f:
-                    config_data = f.read().decode("utf-8")
-                    result: dict[str, Any] = yaml.safe_load(config_data)
-                    return result
+            try:
+                with zipfile.ZipFile(self.full_path, "r") as pyz:
+                    with pyz.open(f"lang/{lang}.yml") as f:
+                        config_data = f.read().decode("utf-8")
+                        result: dict[str, Any] = yaml.safe_load(config_data) or {}
+                        return result
+            except KeyError:
+                # 归档中没有对应语言文件：插件可选语言文件，返回空字典
+                return {}
         else:
-            with open(f"{self.path}/lang/{lang}.yml", "r", encoding="utf-8") as f:
-                data: dict[str, Any] = yaml.load(stream=f, Loader=yaml.FullLoader)
+            target = Path(self.path) / "lang" / f"{lang}.yml"
+            if not target.exists():
+                # 目录形式插件缺少语言文件：返回空字典
+                return {}
+            with target.open("r", encoding="utf-8") as f:
+                data: dict[str, Any] = (
+                    yaml.load(stream=f, Loader=yaml.FullLoader) or {}
+                )
                 return data
 
     def _get_nested_value(

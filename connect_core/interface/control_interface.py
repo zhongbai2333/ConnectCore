@@ -342,7 +342,10 @@ class PluginControlInterface(CoreControlInterface):
         self.config_file: ServerConfig | ClientConfig | BaseConfig = config_file or BaseConfig()  # type: ignore[assignment]
         self.mcdr_core = mcdr_core
         self.log_system = LogSystem(self.sid)
-        self.language_file = YmlLanguage(path=self.self_path, sid=self.sid, lang=self.config_file.language)  # type: ignore[attr-defined]
+        # 兼容 config_file 既可能是 BaseConfig 实例（含 language 字段），也可能是
+        # 未实例化的配置类或没有 language 字段的 BaseConfig 子类。
+        plugin_lang = getattr(self.config_file, "language", None) or "en_us"
+        self.language_file = YmlLanguage(path=self.self_path, sid=self.sid, lang=plugin_lang)
         self.command_control = self.CommandControl(self.sid)
 
     def send_data(self, server_id: str, plugin_id: str, data: dict) -> None:
