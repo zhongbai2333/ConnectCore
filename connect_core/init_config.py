@@ -266,6 +266,11 @@ class ServerConfig(BaseConfig):
     healthcheck_host: str = Field("127.0.0.1", "健康检查监听地址 / Health check bind host")
     healthcheck_port: int = Field(23234, "健康检查监听端口 / Health check bind port")
     plugin_sandbox_enabled: bool = Field(True, "是否启用插件导入沙箱 / Enable plugin import sandbox")
+    max_packet_size: int = Field(
+        64 * 1024 * 1024,
+        "单个 WebSocket 消息最大字节数。0 表示不限制。默认 64 MiB。"
+        " / Max bytes per WebSocket message; 0 means unlimited; default 64 MiB.",
+    )
 
 
 class ClientConfig(BaseConfig):
@@ -277,3 +282,8 @@ class ClientConfig(BaseConfig):
     account: str = Field("", "账号 / Account")
     password: str = Field("", "密码 / Password")
     plugin_sandbox_enabled: bool = Field(True, "是否启用插件导入沙箱 / Enable plugin import sandbox")
+    max_packet_size: int = Field(
+        64 * 1024 * 1024,
+        "单个 WebSocket 消息最大字节数。0 表示不限制。默认 64 MiB。"
+        " / Max bytes per WebSocket message; 0 means unlimited; default 64 MiB.",
+    )

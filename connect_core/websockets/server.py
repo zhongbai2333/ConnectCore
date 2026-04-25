@@ -151,12 +151,16 @@ class WebsocketServer:
         """主协程：创建 websockets 服务并等待关闭。"""
 
         try:
+            max_size = getattr(self._control.config, "max_packet_size", 64 * 1024 * 1024)
+            if not isinstance(max_size, int) or max_size <= 0:
+                max_size = None  # 不限制
             self.server = await websockets.serve(
                 self._handler,
                 self._host,
                 self._port,
                 ping_interval=PING_INTERVAL,
                 ping_timeout=PING_TIMEOUT,
+                max_size=max_size,
             )
             self._control.logger.info(
                 self._control.tr("net_core.service.start_websocket")

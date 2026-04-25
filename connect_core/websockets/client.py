@@ -129,7 +129,10 @@ class WebsocketClient:
             while True:
                 try:
                     uri = f"ws://{self.host}:{self.port}"
-                    self.websocket = await websockets.connect(uri)
+                    max_size = getattr(self._control.config, "max_packet_size", 64 * 1024 * 1024)
+                    if not isinstance(max_size, int) or max_size <= 0:
+                        max_size = None  # 不限制
+                    self.websocket = await websockets.connect(uri, max_size=max_size)
                     self.finish_start = True
                     self._control.info(
                         self._control.tr("net_core.service.connect_websocket", "")
