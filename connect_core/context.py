@@ -20,6 +20,10 @@ class _ContextState:
     server_mode: bool = False
     mcdr_mode: bool = False
     mcdr_core: Any = None
+    # 在 GlobalContext 初始化时锁定本体运行路径，避免后续插件加载
+    # 过程中修改 sys.path[0] 导致路径被污染（如加载器会把插件
+    # 目录 insert(0)）。
+    base_path: Optional[Path] = None
 
 
 # 单例实例，由 GlobalContext.__init__ 写入
@@ -55,6 +59,12 @@ class GlobalContext(object):
         _state.server_mode = server
         _state.mcdr_mode = mcdr
         _state.mcdr_core = mcdr_interface
+        # 锁定本体运行路径：优先 MCDR 提供的数据目录，
+        # 其次使用当前 sys.path[0]（进程启动时的脚本路径）。
+        # 一旦设定不再变化，插件加载过程中修改 sys.path 不会影响该路径。
+        if _state.base_path is None:
+            initial = sys.path[0] if sys.path else ""
+            _state.base_path = Path(initial)
 
     # ---- 测试辅助 ----
     @staticmethod
@@ -65,6 +75,7 @@ class GlobalContext(object):
         _state.server_mode = False
         _state.mcdr_mode = False
         _state.mcdr_core = None
+        _state.base_path = None
 
     @staticmethod
     def get_state() -> _ContextState:
@@ -99,7 +110,10 @@ class GlobalContext(object):
 
     @staticmethod
     def get_path() -> Path:
-        """获取当前脚本所在路径"""
+        """获取本体运行脚本所在路径（初始化时锁定）。"""
+        if _state.base_path is not None:
+            return _state.base_path
+        # 未初始化 GlobalContext 时的兼容路径
         return Path(sys.path[0] if sys.path else "")
 
     @staticmethod
